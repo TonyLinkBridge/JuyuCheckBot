@@ -1,4 +1,5 @@
 import { InlineKeyboard } from "grammy";
+import type { StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
 import { encodeDomainParam } from "./domain/normalize.js";
 import type { DomainIntent, DomainReport, RegistrationStatus, RiskLevel } from "./domain/types.js";
@@ -15,6 +16,9 @@ export function welcomeKeyboard(config: Config): InlineKeyboard {
   return new InlineKeyboard()
     .text("🔍 开始域名体检", "start_check")
     .row()
+    .text("🕘 最近体检", "recent_reports")
+    .text("🔐 隐私", "privacy")
+    .row()
     .url("📡 JUYU 情报局", config.CHANNEL_URL);
 }
 
@@ -24,6 +28,10 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 <code>example.com</code>
 
 免费 Preview 会显示 JUYU Score、等级、品牌力、记忆度、商业潜力和风险。选择你的目的后，订阅 JUYU 情报局即可解锁完整 DATA、JUYU ANALYSIS 与行动建议。
+
+常用命令：
+/recent 最近体检
+/privacy 隐私与数据删除
 
 <i>结果仅供初步筛查，不替代商标、法律、安全、估值或交易尽调。</i>`;
 
@@ -134,21 +142,17 @@ ${escapeHtml(actionAdvice(report, intent))}
 
 <i>${report.scoreVersion} · 置信度 ${confidenceLabel(report.confidence)} · 数据覆盖 ${report.dataCoverage}%
 体检时间：${formatDateTime(report.checkedAt)}
-商业潜力与市场信号暂未包含成交数据库。本报告不构成估值、商标、法律、安全或交易意见。</i>`;
+商业潜力与活跃度信号暂未包含成交数据库。本报告不构成估值、商标、法律、安全或交易意见。</i>`;
 }
 
 export function fullReportKeyboard(
   config: Config,
   report: DomainReport,
   intent: DomainIntent,
+  token: string,
 ): InlineKeyboard {
   const keyboard = new InlineKeyboard();
-  const reportLink = botShareLink(config.BOT_USERNAME, report.domain);
-  const shareText = `我刚用 JUYU 给 ${report.domain} 做了域名体检：${report.score}/100，${report.grade}级。你也来查查：`;
-  keyboard.url(
-    "📤 分享这份体检",
-    `https://t.me/share/url?url=${encodeURIComponent(reportLink)}&text=${encodeURIComponent(shareText)}`,
-  );
+  keyboard.text("📤 生成分享卡", `share:${intent}:${token}`);
 
   if (intent === "owner") {
     keyboard
@@ -172,6 +176,77 @@ export function fullReportKeyboard(
   return keyboard;
 }
 
+export function shareCardText(report: DomainReport): string {
+  const { brandability, memorability, commercialPotential } = report.dimensions;
+  return `📤 <b>JUYU DOMAIN CHECK</b>
+
+🌐 <b>${escapeHtml(report.domain)}</b>
+
+<b>${report.score} / 100　${report.grade}级</b>
+
+品牌力　　${brandability.score}
+记忆度　　${memorability.score}
+商业潜力　${commercialPotential.score}
+风险等级　${riskLabel(report.riskLevel)}
+
+<b>${escapeHtml(report.verdict)}</b>
+
+<i>免费域名体检 · Powered by JUYU 聚域</i>`;
+}
+
+export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
+  const reportLink = referralLink(config.BOT_USERNAME, token);
+  const shareText = `我刚用 JUYU 给 ${report.domain} 做了域名体检：${report.score}/100，${report.grade}级。你也来查查：`;
+  return new InlineKeyboard()
+    .url(
+      "📤 转发给朋友",
+      `https://t.me/share/url?url=${encodeURIComponent(reportLink)}&text=${encodeURIComponent(shareText)}`,
+    )
+    .row()
+    .url("🔍 打开免费体检", reportLink);
+}
+
+export function recentReportsText(reports: StoredReport[]): string {
+  if (!reports.length) return "🕘 <b>最近体检</b>\n\n还没有保存的报告。直接发送一个域名开始体检。";
+  return `🕘 <b>最近体检</b>\n\n选择一份报告重新查看：`;
+}
+
+export function recentReportsKeyboard(reports: StoredReport[]): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  for (const item of reports) {
+    keyboard.text(`${item.report.domain} · ${item.report.score}/${item.report.grade}`, `history:${item.reportToken}`).row();
+  }
+  return keyboard.text("🔎 新体检", "start_check");
+}
+
+export function privacyKeyboard(config: Config): InlineKeyboard {
+  const policyUrl = config.WEBHOOK_URL ? `${config.WEBHOOK_URL}/privacy` : "https://www.juyu.com/";
+  return new InlineKeyboard()
+    .url("📄 查看完整隐私说明", policyUrl)
+    .row()
+    .text("🗑 删除我的数据", "delete_data_request");
+}
+
+export const deleteDataConfirmText = `⚠️ <b>确认删除数据？</b>
+
+这会删除与你的 Telegram 用户 ID 关联的体检报告、使用意图、来源和产品事件。操作无法恢复。`;
+
+export function deleteDataConfirmKeyboard(): InlineKeyboard {
+  return new InlineKeyboard().text("确认永久删除", "delete_data_confirm").text("取消", "delete_data_cancel");
+}
+
+export function rateLimitText(scope: "minute" | "day", retryAfterSeconds: number): string {
+  if (scope === "day") {
+    const hours = Math.max(1, Math.ceil(retryAfterSeconds / 3600));
+    return `⏳ 今天的免费体检次数已经用完，请约 ${hours} 小时后再试。`;
+  }
+  return `⏳ 操作有点快，请 ${Math.max(1, retryAfterSeconds)} 秒后再试。`;
+}
+
+export const verificationUnavailableText = `⚠️ 暂时无法连接 Telegram 验证订阅状态。
+
+这不代表你没有订阅，请稍后再次点击「立即解锁」。`;
+
 export function notSubscribedText(config: Config): string {
   return `还没有检测到订阅状态。\n\n请先订阅 <b>${escapeHtml(config.CHANNEL_NAME)}</b>，然后回来再次点击「立即解锁」。\n\n🔔 建议开启通知，不错过每日域名情报；通知状态不会作为解锁条件。`;
 }
@@ -181,6 +256,10 @@ export function botShareLink(botUsername: string, domain: string): string {
   return payload.length <= 64
     ? `https://t.me/${botUsername}?start=${encodeURIComponent(payload)}`
     : `https://t.me/${botUsername}?start=share`;
+}
+
+function referralLink(botUsername: string, token: string): string {
+  return `https://t.me/${botUsername}?start=${encodeURIComponent(`ref_${token}`)}`;
 }
 
 function commerceLink(botUsername: string, action: string, domain: string): string {

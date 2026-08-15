@@ -9,7 +9,7 @@ import type {
   ScoreGrade,
 } from "./types.js";
 
-export const SCORE_VERSION = "JUYU-1.0";
+export const SCORE_VERSION = "JUYU-1.1";
 
 type ScoreInput = {
   domain: string;
@@ -59,6 +59,7 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
   const suffix = labels.slice(1).join(".");
   const hyphens = (name.match(/-/g) ?? []).length;
   const digits = (name.match(/\d/g) ?? []).length;
+  const language = analyzeName(name);
 
   const riskFlags: string[] = [];
   const strengths: string[] = [];
@@ -86,6 +87,10 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
   if (hyphens >= 2) structureNotes.push("包含多个连字符，口述传播较困难");
   else if (hyphens === 1) structureNotes.push("包含连字符，需留意输入流失");
   if (digits >= 3) structureNotes.push("数字较多，品牌辨识度可能受影响");
+  if (language.pronounceable) strengths.push("字母结构具备较好的发音线索");
+  else if (language.isAlphabetic && name.length >= 4) structureNotes.push("字母组合发音线索较弱，需测试口述传播");
+  if (language.repeatedRun >= 3) structureNotes.push("存在连续重复字符，容易产生输入歧义");
+  if (language.commercialKeyword) strengths.push(`包含通用商业语义：${language.commercialKeyword}`);
   if (suffix === "com") strengths.push(".com 具备较强的全球认知度");
   if (input.rdap.status === "available") structureNotes.push("RDAP 未发现注册记录，可能尚未注册");
 
@@ -102,6 +107,7 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
     rdap: input.rdap,
     dns: input.dns,
     ageYears,
+    language,
   });
   const weighted = Object.values(dimensions).reduce(
     (total, dimension) => total + dimension.score * dimension.weight,
@@ -140,29 +146,38 @@ type DimensionInput = {
   rdap: RdapResult;
   dns: DnsResult;
   ageYears: number | null;
+  language: NameSignals;
 };
 
 function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, ScoreDimension> {
-  let brandability = 50;
+  let brandability = 45;
   if (input.name.length <= 6) brandability += 25;
   else if (input.name.length <= 12) brandability += 15;
   else if (input.name.length > 20) brandability -= 15;
   brandability += input.hyphens === 0 ? 10 : input.hyphens >= 2 ? -20 : -8;
   brandability += input.digits === 0 ? 5 : input.digits >= 3 ? -12 : -4;
   if (input.suffix === "com") brandability += 5;
+  if (input.language.pronounceable) brandability += 12;
+  else if (input.language.isAlphabetic && input.name.length >= 4) brandability -= 14;
+  if (input.language.repeatedRun >= 3) brandability -= 10;
+  if (input.language.commercialKeyword) brandability += 6;
 
-  let memorability = 55;
+  let memorability = 50;
   if (input.name.length <= 6) memorability += 25;
   else if (input.name.length <= 12) memorability += 12;
   else if (input.name.length > 20) memorability -= 18;
   memorability += input.hyphens === 0 ? 12 : input.hyphens >= 2 ? -18 : -8;
   memorability += input.digits === 0 ? 8 : input.digits >= 3 ? -12 : -4;
+  if (input.language.pronounceable) memorability += 10;
+  else if (input.language.isAlphabetic && input.name.length >= 4) memorability -= 18;
+  if (input.language.repeatedRun >= 3) memorability -= 12;
 
-  let commercialPotential = 50;
+  let commercialPotential = 45;
   commercialPotential += input.suffix === "com" ? 20 : input.suffix === "ai" ? 15 : input.suffix === "io" ? 10 : 0;
-  if (input.name.length <= 12) commercialPotential += 10;
-  if (input.rdap.status === "registered") commercialPotential += 5;
-  if (input.dns.resolves) commercialPotential += 5;
+  if (input.name.length <= 12) commercialPotential += 5;
+  if (input.language.pronounceable) commercialPotential += 5;
+  else if (input.language.isAlphabetic && input.name.length >= 4) commercialPotential -= 5;
+  if (input.language.commercialKeyword) commercialPotential += 8;
   if (input.hyphens > 0) commercialPotential -= 10;
   if (input.digits >= 3) commercialPotential -= 8;
 
@@ -194,13 +209,17 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
       "brandability",
       "品牌力",
       brandability,
-      `主体 ${input.name.length} 字符；${input.hyphens ? `含 ${input.hyphens} 个连字符` : "无连字符"}`,
+      input.language.pronounceable
+        ? `主体 ${input.name.length} 字符；具备较好的发音线索`
+        : `主体 ${input.name.length} 字符；需进一步验证语言与发音`,
     ),
     memorability: dimension(
       "memorability",
       "记忆度",
       memorability,
-      input.name.length <= 12 && input.hyphens === 0 ? "长度与输入结构较友好" : "输入结构存在一定记忆成本",
+      input.name.length <= 12 && input.hyphens === 0 && input.language.pronounceable
+        ? "长度、输入与发音结构较友好"
+        : "输入或发音结构存在一定记忆成本",
     ),
     commercialPotential: dimension(
       "commercialPotential",
@@ -222,9 +241,9 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
     ),
     marketSignals: dimension(
       "marketSignals",
-      "市场信号",
+      "活跃度信号",
       marketSignals,
-      "基于域龄与 DNS 活跃度，暂未包含挂牌及成交数据",
+      "仅基于域龄与 DNS 活跃度，不代表市场需求或成交表现",
     ),
   };
 }
@@ -277,11 +296,74 @@ function gradeFor(score: number): ScoreGrade {
 
 function buildVerdict(score: number, risk: RiskLevel): string {
   if (risk === "high") return "基础信号存在明确风险，建议先完成状态与历史尽调。";
-  if (score >= 90) return "结构与基础市场信号突出，具备进一步品牌评估价值。";
+  if (score >= 90) return "结构、发音与基础活跃度突出，具备进一步品牌评估价值。";
   if (score >= 80) return "整体结构清晰，品牌与商业延展条件较好。";
   if (score >= 70) return "具备可用基础，但仍需结合行业语义与价格判断。";
   if (score >= 60) return "基础条件一般，建议重点核对命名成本与应用场景。";
   return "结构或基础信号偏弱，投入前建议进行更严格比较。";
+}
+
+type NameSignals = {
+  isAlphabetic: boolean;
+  pronounceable: boolean;
+  repeatedRun: number;
+  commercialKeyword: string | null;
+};
+
+const commercialKeywords = [
+  "ai",
+  "app",
+  "bank",
+  "brand",
+  "car",
+  "cloud",
+  "crypto",
+  "data",
+  "finance",
+  "health",
+  "home",
+  "pay",
+  "shop",
+  "tech",
+  "travel",
+];
+
+function analyzeName(name: string): NameSignals {
+  const normalized = name.toLowerCase();
+  const isAlphabetic = /^[a-z]+$/.test(normalized);
+  const repeatedRun = longestRun(normalized, (character, previous) => character === previous);
+  if (!isAlphabetic) {
+    return { isAlphabetic, pronounceable: false, repeatedRun, commercialKeyword: findKeyword(normalized) };
+  }
+
+  const vowelCount = (normalized.match(/[aeiouy]/g) ?? []).length;
+  const vowelRatio = vowelCount / Math.max(1, normalized.length);
+  const consonantRun = longestRun(normalized, (character) => !/[aeiouy]/.test(character));
+  const pronounceable =
+    normalized.length <= 3 ||
+    (vowelCount > 0 && vowelRatio >= 0.2 && vowelRatio <= 0.7 && consonantRun <= 3 && repeatedRun < 3);
+  return {
+    isAlphabetic,
+    pronounceable,
+    repeatedRun,
+    commercialKeyword: findKeyword(normalized),
+  };
+}
+
+function longestRun(value: string, matches: (character: string, previous: string) => boolean): number {
+  let longest = value.length ? 1 : 0;
+  let current = longest;
+  for (let index = 1; index < value.length; index += 1) {
+    const character = value[index] ?? "";
+    const previous = value[index - 1] ?? "";
+    current = matches(character, previous) ? current + 1 : 1;
+    longest = Math.max(longest, current);
+  }
+  return longest;
+}
+
+function findKeyword(name: string): string | null {
+  return commercialKeywords.find((keyword) => name === keyword || name.startsWith(keyword) || name.endsWith(keyword)) ?? null;
 }
 
 function clamp(value: number): number {

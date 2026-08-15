@@ -17,11 +17,16 @@ export class AttributionStore {
     }
     return value.source;
   }
+
+  delete(userId: number): void {
+    this.sources.delete(userId);
+  }
 }
 
 export function sourceFromStartPayload(payload: string | undefined): string {
   if (!payload) return "direct";
   if (payload.startsWith("share_")) return "share";
+  if (payload.startsWith("ref_")) return "referral";
   if (payload.startsWith("src_")) return normalizeSource(payload.slice(4));
   if (payload === "channel" || payload === "juyucom") return payload;
   return "direct";

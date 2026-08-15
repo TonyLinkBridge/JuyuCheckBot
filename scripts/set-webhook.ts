@@ -22,6 +22,8 @@ await bot.api.setMyCommands([
   { command: "start", description: "开始域名体检" },
   { command: "check", description: "体检一个域名" },
   { command: "help", description: "查看使用说明" },
+  { command: "recent", description: "查看最近体检" },
+  { command: "privacy", description: "隐私与数据删除" },
 ]);
 await bot.api.setWebhook(`${url.origin}${WEBHOOK_PATH}`, {
   secret_token: config.WEBHOOK_SECRET,

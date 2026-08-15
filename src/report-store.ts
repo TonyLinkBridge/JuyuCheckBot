@@ -14,7 +14,7 @@ export class ReportStore {
 
   put(userId: number, report: DomainReport): string {
     this.prune();
-    const token = randomBytes(6).toString("base64url");
+    const token = randomBytes(12).toString("base64url");
     this.entries.set(token, { report, userId, expiresAt: Date.now() + this.ttlMs });
     return token;
   }
@@ -26,6 +26,12 @@ export class ReportStore {
       return null;
     }
     return entry.report;
+  }
+
+  deleteUser(userId: number): void {
+    for (const [token, entry] of this.entries) {
+      if (entry.userId === userId) this.entries.delete(token);
+    }
   }
 
   private prune(): void {

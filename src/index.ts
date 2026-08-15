@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from "express";
 import { webhookCallback } from "grammy";
 import { createBot } from "./bot.js";
 import { loadConfig } from "./config.js";
+import { landingHtml, privacyHtml } from "./privacy.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
 
@@ -11,6 +12,12 @@ const app = express();
 const telegramWebhook = webhookCallback(bot, "express");
 
 app.use(express.json({ limit: "1mb" }));
+app.get("/", (_request, response) => {
+  response.type("html").send(landingHtml(config.BOT_USERNAME, config.CHANNEL_URL));
+});
+app.get("/privacy", (_request, response) => {
+  response.type("html").send(privacyHtml("JUYU 域名体检"));
+});
 app.get("/health", (_request, response) => {
   response.status(200).json({ ok: true, service: "juyu-domain-check" });
 });
@@ -46,6 +53,8 @@ async function startLocalProcess(): Promise<void> {
     { command: "start", description: "开始域名体检" },
     { command: "check", description: "体检一个域名" },
     { command: "help", description: "查看使用说明" },
+    { command: "recent", description: "查看最近体检" },
+    { command: "privacy", description: "隐私与数据删除" },
   ]);
 
   if (config.WEBHOOK_URL && config.WEBHOOK_SECRET) {

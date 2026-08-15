@@ -36,11 +36,35 @@ describe("scoreDomain", () => {
     });
     expect(result.score).toBeGreaterThanOrEqual(90);
     expect(result.grade).toBe("S");
-    expect(result.scoreVersion).toBe("JUYU-1.0");
+    expect(result.scoreVersion).toBe("JUYU-1.1");
     expect(result.confidence).toBe("medium");
     expect(Object.keys(result.dimensions)).toHaveLength(6);
     expect(result.dimensions.extensionFit.score).toBe(100);
     expect(result.riskLevel).toBe("low");
+  });
+
+  it("does not treat an unpronounceable short string like a strong word brand", () => {
+    const word = scoreDomain({
+      domain: "brand.com",
+      registrableDomain: "brand.com",
+      isIdn: false,
+      rdap: rdap(),
+      dns: healthyDns,
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+    const random = scoreDomain({
+      domain: "xqzv.com",
+      registrableDomain: "xqzv.com",
+      isIdn: false,
+      rdap: rdap(),
+      dns: healthyDns,
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+
+    expect(word.score).toBeGreaterThan(random.score);
+    expect(random.dimensions.brandability.score).toBeLessThan(word.dimensions.brandability.score);
+    expect(random.structureNotes.join(" ")).toContain("发音线索较弱");
+    expect(random.dimensions.marketSignals.label).toBe("活跃度信号");
   });
 
   it("flags a domain that expires within 30 days and has no DNS", () => {

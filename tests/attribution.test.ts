@@ -7,6 +7,7 @@ describe("start attribution", () => {
     ["channel", "channel"],
     ["juyucom", "juyucom"],
     ["share_example-com", "share"],
+    ["ref_reporttoken", "referral"],
     ["src_kol-Tony!", "kol-tony_"],
   ])("maps %s to %s", (payload, expected) => {
     expect(sourceFromStartPayload(payload)).toBe(expected);

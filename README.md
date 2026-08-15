@@ -1,6 +1,6 @@
 # 🔍 JUYU 域名体检
 
-`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。它不是客服菜单：用户发送域名后立即获得 Score Preview，选择使用意图，订阅 **JUYU 聚域｜域名情报局** 后解锁完整报告，再通过分享和按意图变化的商业深链形成增长闭环。
+`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。它不是客服菜单：用户发送域名后立即获得 Score Preview，选择使用意图，订阅 **JUYU 聚域｜域名情报局** 后解锁完整报告，再通过可追踪分享和按意图变化的商业深链形成增长闭环。
 
 正式 Bot 用户名：`@JuyuCheckBot`。
 
@@ -16,12 +16,17 @@
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
 - 免费 RDAP 注册信息与原生 DNS 检查，不使用演示数据
-- 版本化 `JUYU-1.0` 六维评分、等级、置信度、数据覆盖和基础风险提醒
+- 版本化 `JUYU-1.1` 六维评分、等级、置信度、数据覆盖和基础风险提醒
 - Preview → 意图 → Growth Gate → `DATA / JUYU ANALYSIS / ACTION` 报告
 - `getChatMember` 频道订阅验证和完整报告 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
 - Supabase REST 后端持久保存并按用户安全读回报告，支持 Vercel 跨实例解锁
+- 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
+- `/recent` 最近报告、15 分钟域名结果缓存和分享推荐深链
+- 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
+- `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
+- `JUYU-1.1` 加入基础发音、重复字符和商业关键词信号，并将“市场信号”校正为“活跃度信号”
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
 ## 本地启动
@@ -108,7 +113,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 
 ## Domain Score 边界
 
-`JUYU-1.0` 包含品牌力、记忆度、商业潜力、后缀匹配、全球化能力与市场信号。当前仍是透明的初筛启发式规则，数据来自 RDAP、DNS 与域名结构；商业潜力和市场信号尚未包含成交数据库。它不是域名估值，也不代表商标可用性、历史内容安全、SEO 信誉或交易合法性。任何权重变更都应发布新的 Score Version。
+`JUYU-1.1` 包含品牌力、记忆度、商业潜力、后缀匹配、全球化能力与活跃度信号。当前仍是透明的初筛启发式规则，数据来自 RDAP、DNS、域名结构和基础发音规则；商业潜力与活跃度尚未包含成交数据库。它不是域名估值，也不代表商标可用性、历史内容安全、SEO 信誉或交易合法性。任何权重变更都应发布新的 Score Version。
 
 ## Supabase 后端
 
@@ -118,7 +123,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 2. 在服务器环境变量填写 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。
 3. 重新部署或重启 Bot；日志出现 `Backend mode: Supabase` 即表示已启用。
 
-Service Role Key 只能存在于后端。不要写入 Mini App、网页前端、Telegram 消息或 Git。启用持久化前请完善 `docs/privacy.md` 并发布隐私政策 URL。
+Service Role Key 只能存在于后端。不要写入 Mini App、网页前端、Telegram 消息或 Git。公开隐私政策地址为部署域名的 `/privacy`。
 
 ## 验证
 
