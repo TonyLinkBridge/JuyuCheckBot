@@ -8,8 +8,12 @@ const schema = z.object({
   CHANNEL_URL: z.url().default("https://t.me/JUYU007"),
   CHANNEL_NAME: z.string().default("JUYU 聚域｜域名情报局"),
   COMMERCE_BOT_USERNAME: z.string().default("JuyuDomainBot").transform(stripAt),
-  WEBHOOK_URL: z.string().optional().transform((value) => value?.replace(/\/$/, "")),
-  WEBHOOK_SECRET: z.string().min(16).optional(),
+  WEBHOOK_URL: z.string().optional().transform((value) => emptyToUndefined(value)?.replace(/\/$/, "")),
+  WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .transform(emptyToUndefined)
+    .pipe(z.string().min(16).max(256).regex(/^[A-Za-z0-9_-]+$/, "WEBHOOK_SECRET 只能包含字母、数字、_ 和 -").optional()),
   PORT: z.coerce.number().int().positive().default(3000),
   CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
   SUPABASE_URL: z.string().optional().transform(emptyToUndefined),
@@ -34,6 +38,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (result.data.WEBHOOK_URL && !result.data.WEBHOOK_SECRET) {
     throw new Error("启用 WEBHOOK_URL 时必须配置 WEBHOOK_SECRET");
+  }
+  if (result.data.WEBHOOK_URL) {
+    try {
+      const url = new URL(result.data.WEBHOOK_URL);
+      if (url.protocol !== "https:") throw new Error();
+    } catch {
+      throw new Error("WEBHOOK_URL 必须是有效的 HTTPS 地址");
+    }
   }
   if (Boolean(result.data.SUPABASE_URL) !== Boolean(result.data.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error("SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 必须同时配置");

@@ -1,6 +1,6 @@
 import { Bot, Context, GrammyError, HttpError } from "grammy";
 import { AttributionStore, sourceFromStartPayload } from "./attribution.js";
-import { createBackend } from "./backend.js";
+import { createBackend, type StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
 import { checkDomain } from "./domain/check.js";
 import { decodeDomainParam, DomainInputError, normalizeDomain } from "./domain/normalize.js";
@@ -34,21 +34,24 @@ export function createBot(config: Config): Bot {
     if (!userId) return;
     const payload = ctx.match?.trim();
     const source = attribution.set(userId, sourceFromStartPayload(payload));
-    void backend.track({ eventName: "bot_started", telegramUserId: userId, source });
+    const startedEvent = backend.track({ eventName: "bot_started", telegramUserId: userId, source });
 
     if (payload?.startsWith("share_")) {
       const encoded = payload.slice("share_".length);
       if (encoded) {
-        await runCheck(ctx, decodeDomainParam(encoded));
+        await Promise.all([startedEvent, runCheck(ctx, decodeDomainParam(encoded))]);
         return;
       }
     }
     if (payload?.startsWith("check_")) {
       attribution.set(userId, "share");
-      await runCheck(ctx, decodeDomainParam(payload.slice("check_".length)));
+      await Promise.all([startedEvent, runCheck(ctx, decodeDomainParam(payload.slice("check_".length)))]);
       return;
     }
-    await ctx.reply(welcomeText, { ...html, reply_markup: welcomeKeyboard(config) });
+    await Promise.all([
+      startedEvent,
+      ctx.reply(welcomeText, { ...html, reply_markup: welcomeKeyboard(config) }),
+    ]);
   });
 
   bot.command("help", (ctx) => ctx.reply(helpText, html));
@@ -78,39 +81,44 @@ export function createBot(config: Config): Bot {
       await ctx.answerCallbackQuery({ text: "体检链接无效，请重新发送域名。", show_alert: true });
       return;
     }
-    const report = reports.get(token, ctx.from.id);
-    if (!report) {
+    const stored = await resolveReport(token, ctx.from.id);
+    if (!stored) {
       await ctx.answerCallbackQuery({ text: "体检结果已过期，请重新发送域名。", show_alert: true });
       return;
     }
+    const { report, source } = stored;
 
-    const source = attribution.get(ctx.from.id);
     await ctx.answerCallbackQuery({ text: `已选择：${intentLabel(intent)}` });
-    void backend.track({
-      eventName: "intent_selected",
-      telegramUserId: ctx.from.id,
-      source,
-      domain: report.domain,
-      reportToken: token,
-      intent,
-    });
-    void backend.saveReport({ reportToken: token, telegramUserId: ctx.from.id, source, report, intent });
-
-    if (await isChannelMember(bot, config, ctx.from.id)) {
-      await deliverFullReport(ctx, report, token, intent);
-    } else {
-      void backend.track({
-        eventName: "gate_shown",
+    const [isMember] = await Promise.all([
+      isChannelMember(bot, config, ctx.from.id),
+      backend.track({
+        eventName: "intent_selected",
         telegramUserId: ctx.from.id,
         source,
         domain: report.domain,
         reportToken: token,
         intent,
-      });
-      await ctx.reply(gateText(config), {
-        ...html,
-        reply_markup: gateKeyboard(config, token, intent),
-      });
+      }),
+      backend.saveReport({ reportToken: token, telegramUserId: ctx.from.id, source, report, intent }),
+    ]);
+
+    if (isMember) {
+      await deliverFullReport(ctx, report, token, intent, source);
+    } else {
+      await Promise.all([
+        backend.track({
+          eventName: "gate_shown",
+          telegramUserId: ctx.from.id,
+          source,
+          domain: report.domain,
+          reportToken: token,
+          intent,
+        }),
+        ctx.reply(gateText(config), {
+          ...html,
+          reply_markup: gateKeyboard(config, token, intent),
+        }),
+      ]);
     }
   });
 
@@ -121,30 +129,32 @@ export function createBot(config: Config): Bot {
       await ctx.answerCallbackQuery({ text: "解锁链接无效，请重新发送域名。", show_alert: true });
       return;
     }
-    const report = reports.get(token, ctx.from.id);
-    if (!report) {
+    const stored = await resolveReport(token, ctx.from.id);
+    if (!stored) {
       await ctx.answerCallbackQuery({ text: "体检结果已过期，请重新发送域名。", show_alert: true });
       return;
     }
+    const { report, source } = stored;
 
-    const source = attribution.get(ctx.from.id);
     await ctx.answerCallbackQuery({ text: "正在验证订阅状态…" });
     if (!(await isChannelMember(bot, config, ctx.from.id))) {
-      void backend.track({
-        eventName: "unlock_failed",
-        telegramUserId: ctx.from.id,
-        source,
-        domain: report.domain,
-        reportToken: token,
-        intent,
-      });
-      await ctx.reply(notSubscribedText(config), {
-        ...html,
-        reply_markup: gateKeyboard(config, token, intent),
-      });
+      await Promise.all([
+        backend.track({
+          eventName: "unlock_failed",
+          telegramUserId: ctx.from.id,
+          source,
+          domain: report.domain,
+          reportToken: token,
+          intent,
+        }),
+        ctx.reply(notSubscribedText(config), {
+          ...html,
+          reply_markup: gateKeyboard(config, token, intent),
+        }),
+      ]);
       return;
     }
-    await deliverFullReport(ctx, report, token, intent);
+    await deliverFullReport(ctx, report, token, intent, source);
   });
 
   bot.on("message:text", async (ctx) => {
@@ -171,18 +181,25 @@ export function createBot(config: Config): Bot {
 
     const userId = ctx.from!.id;
     const source = attribution.get(userId);
-    void backend.track({ eventName: "domain_submitted", telegramUserId: userId, source, domain: domain.ascii });
+    const submittedEvent = backend.track({
+      eventName: "domain_submitted",
+      telegramUserId: userId,
+      source,
+      domain: domain.ascii,
+    });
     const progress = await ctx.reply(checkingText(domain.ascii), html);
     try {
-      const report = await checkDomain(domain, config.CHECK_TIMEOUT_MS);
+      const [report] = await Promise.all([checkDomain(domain, config.CHECK_TIMEOUT_MS), submittedEvent]);
       const token = reports.put(userId, report);
+      const persisted = await backend.saveReport({ reportToken: token, telegramUserId: userId, source, report });
+      if (backend.enabled && !persisted) throw new Error("Report persistence failed");
       await ctx.api.editMessageText(
         ctx.chat!.id,
         progress.message_id,
         `${previewReportText(report)}\n\n${intentPromptText}`,
         { ...html, reply_markup: intentKeyboard(token) },
       );
-      void backend.track({
+      await backend.track({
         eventName: "preview_shown",
         telegramUserId: userId,
         source,
@@ -190,7 +207,6 @@ export function createBot(config: Config): Bot {
         reportToken: token,
         metadata: { score: report.score, grade: report.grade, scoreVersion: report.scoreVersion },
       });
-      void backend.saveReport({ reportToken: token, telegramUserId: userId, source, report });
     } catch {
       console.error(`Domain check failed for ${domain.ascii}`);
       await ctx.api.editMessageText(ctx.chat!.id, progress.message_id, "⚠️ 体检服务暂时繁忙，请稍后再试。");
@@ -202,20 +218,35 @@ export function createBot(config: Config): Bot {
     report: DomainReport,
     token: string,
     intent: DomainIntent,
+    source: string,
   ): Promise<void> {
-    const source = attribution.get(ctx.from!.id);
-    void backend.track({
-      eventName: "report_unlocked",
-      telegramUserId: ctx.from!.id,
-      source,
-      domain: report.domain,
-      reportToken: token,
-      intent,
-    });
-    await ctx.reply(fullReportText(report, intent), {
-      ...html,
-      reply_markup: fullReportKeyboard(config, report, intent),
-    });
+    await Promise.all([
+      backend.track({
+        eventName: "report_unlocked",
+        telegramUserId: ctx.from!.id,
+        source,
+        domain: report.domain,
+        reportToken: token,
+        intent,
+      }),
+      ctx.reply(fullReportText(report, intent), {
+        ...html,
+        reply_markup: fullReportKeyboard(config, report, intent),
+      }),
+    ]);
+  }
+
+  async function resolveReport(token: string, userId: number): Promise<StoredReport | null> {
+    const cached = reports.get(token, userId);
+    if (cached) {
+      return {
+        reportToken: token,
+        telegramUserId: userId,
+        source: attribution.get(userId),
+        report: cached,
+      };
+    }
+    return backend.getReport(token, userId);
   }
 
   console.log(`Backend mode: ${backend.enabled ? "Supabase" : "memory"}`);
