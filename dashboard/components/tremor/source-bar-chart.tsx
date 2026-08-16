@@ -9,15 +9,15 @@ export function SourceBarChart({ data }: { data: DashboardData["sources"] }) {
     <div className="source-chart" role="img" aria-label="Acquisition sources chart">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data.slice(0, 6)} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
-          <CartesianGrid stroke="#24272d" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="source" axisLine={false} tickLine={false} tick={{ fill: "#777f89", fontSize: 10 }} />
-          <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "#777f89", fontSize: 10 }} />
+          <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="source" axisLine={false} tickLine={false} tick={{ fill: "var(--text-soft)", fontSize: 10 }} />
+          <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "var(--text-soft)", fontSize: 10 }} />
           <Tooltip
-            cursor={{ fill: "rgba(255,255,255,.035)" }}
-            contentStyle={{ background: "#111317", border: "1px solid #30343b", borderRadius: 9, fontSize: 12 }}
+            cursor={{ fill: "var(--row-hover)" }}
+            contentStyle={{ background: "var(--tooltip)", border: "1px solid var(--border)", borderRadius: 9, fontSize: 12, color: "var(--text-medium)" }}
           />
-          <Bar dataKey="newUsers" name="New Users" fill="#58d0a6" radius={[4, 4, 0, 0]} maxBarSize={34} />
-          <Bar dataKey="activated" name="Activated" fill="#5e6672" radius={[4, 4, 0, 0]} maxBarSize={34} />
+          <Bar dataKey="newUsers" name="New Users" fill="var(--green)" radius={[4, 4, 0, 0]} maxBarSize={34} />
+          <Bar dataKey="activated" name="Activated" fill="var(--text-faint)" radius={[4, 4, 0, 0]} maxBarSize={34} />
         </BarChart>
       </ResponsiveContainer>
     </div>

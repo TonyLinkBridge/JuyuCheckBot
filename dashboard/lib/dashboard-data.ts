@@ -34,6 +34,8 @@ export type Metric = {
   value: number;
   previous: number;
   format: "number" | "percent" | "decimal";
+  numerator?: number;
+  denominator?: number;
 };
 
 export type DashboardData = {
@@ -195,12 +197,12 @@ function buildDashboard(
     generatedAt: now.toISOString(),
     range,
     totals: {
-      newUsers: metric(currentMetrics.newUsers, previousMetrics.newUsers, "number"),
-      toolUsers: metric(currentMetrics.toolUsers, previousMetrics.toolUsers, "number"),
-      unlockRate: metric(currentMetrics.unlockRate, previousMetrics.unlockRate, "percent"),
-      shareRate: metric(currentMetrics.shareRate, previousMetrics.shareRate, "percent"),
-      referredUsers: metric(currentMetrics.referredUsers, previousMetrics.referredUsers, "number"),
-      loopRate: metric(currentMetrics.loopRate, previousMetrics.loopRate, "percent"),
+      newUsers: metric(currentMetrics.newUsers, previousMetrics.newUsers, "number", currentMetrics.newUsers),
+      toolUsers: metric(currentMetrics.toolUsers, previousMetrics.toolUsers, "number", currentMetrics.toolUsers),
+      unlockRate: metric(currentMetrics.unlockRate, previousMetrics.unlockRate, "percent", currentMetrics.unlocked, currentMetrics.previewed),
+      shareRate: metric(currentMetrics.shareRate, previousMetrics.shareRate, "percent", currentMetrics.shared, currentMetrics.unlocked),
+      referredUsers: metric(currentMetrics.referredUsers, previousMetrics.referredUsers, "number", currentMetrics.referredUsers),
+      loopRate: metric(currentMetrics.loopRate, previousMetrics.loopRate, "percent", currentMetrics.referredUsers, currentMetrics.shared),
     },
     funnel: [
       { key: "new", label: "New User", value: newUserIds.size },
@@ -271,6 +273,9 @@ function periodMetrics(events: GrowthEvent[]) {
   return {
     newUsers,
     toolUsers,
+    previewed,
+    unlocked,
+    shared,
     unlockRate: ratio(unlocked, previewed),
     shareRate: ratio(shared, unlocked),
     referredUsers,
@@ -347,8 +352,8 @@ function intersectionSize(left: Set<number>, right: Set<number>): number {
   return count;
 }
 
-function metric(value: number, previous: number, format: Metric["format"]): Metric {
-  return { value, previous, format };
+function metric(value: number, previous: number, format: Metric["format"], numerator?: number, denominator?: number): Metric {
+  return { value, previous, format, numerator, denominator };
 }
 
 function ratio(numerator: number, denominator: number): number {
