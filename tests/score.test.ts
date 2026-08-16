@@ -37,8 +37,11 @@ describe("scoreDomain", () => {
     });
     expect(result.score).toBeGreaterThanOrEqual(90);
     expect(result.grade).toBe("S");
-    expect(result.scoreVersion).toBe("JUYU-1.2");
+    expect(result.scoreVersion).toBe("JUYU-1.3");
     expect(result.confidence).toBe("medium");
+    expect(result.evidenceGrade).toBe("B");
+    expect(result.provisional).toBe(false);
+    expect(result.marketEvidence).toBe("limited");
     expect(Object.keys(result.dimensions)).toHaveLength(6);
     expect(result.dimensions.extensionFit.score).toBe(100);
     expect(result.riskLevel).toBe("low");
@@ -65,7 +68,8 @@ describe("scoreDomain", () => {
     expect(word.score).toBeGreaterThan(random.score);
     expect(random.dimensions.brandability.score).toBeLessThan(word.dimensions.brandability.score);
     expect(random.structureNotes.join(" ")).toContain("发音线索较弱");
-    expect(random.dimensions.marketSignals.label).toBe("活跃度信号");
+    expect(random.dimensions.marketSignals.label).toBe("基础活跃度");
+    expect(random.dimensions.marketSignals.weight).toBe(0);
   });
 
   it("flags a domain that expires within 30 days and has no DNS", () => {
@@ -85,6 +89,28 @@ describe("scoreDomain", () => {
     expect(result.riskFlags.join(" ")).toContain("不足 30 天");
     expect(result.score).toBeLessThan(50);
     expect(result.grade).toBe("D");
+  });
+
+  it("keeps structure quality separate from registration risk", () => {
+    const safe = scoreDomain({
+      domain: "brand.com",
+      registrableDomain: "brand.com",
+      isIdn: false,
+      rdap: rdap({ expiresAt: new Date("2028-01-01T00:00:00Z") }),
+      dns: healthyDns,
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+    const expiring = scoreDomain({
+      domain: "brand.com",
+      registrableDomain: "brand.com",
+      isIdn: false,
+      rdap: rdap({ expiresAt: new Date("2026-08-20T00:00:00Z") }),
+      dns: healthyDns,
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+
+    expect(expiring.riskLevel).toBe("high");
+    expect(expiring.score).toBe(safe.score);
   });
 
   it("does not punish the total score when external activity data is unavailable", () => {
@@ -113,8 +139,10 @@ describe("scoreDomain", () => {
 
     expect(incomplete.score).toBeGreaterThanOrEqual(complete.score - 2);
     expect(incomplete.confidence).toBe("low");
+    expect(incomplete.evidenceGrade).toBe("D");
+    expect(incomplete.provisional).toBe(true);
     expect(incomplete.riskLevel).toBe("unknown");
     expect(incomplete.dimensions.marketSignals.available).toBe(false);
-    expect(incomplete.dimensions.marketSignals.conclusion).toContain("不参与总分");
+    expect(incomplete.dimensions.marketSignals.conclusion).toContain("不参与结构总分");
   });
 });

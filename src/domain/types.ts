@@ -25,6 +25,8 @@ export type RiskLevel = "low" | "medium" | "high" | "unknown";
 export type DomainIntent = "owner" | "buyer" | "research";
 export type ScoreGrade = "S" | "A" | "B" | "C" | "D";
 export type ScoreConfidence = "low" | "medium";
+export type EvidenceGrade = "A" | "B" | "C" | "D";
+export type MarketEvidence = "limited";
 export type ScoreDimensionKey =
   | "brandability"
   | "memorability"
@@ -56,6 +58,9 @@ export type DomainReport = {
   grade: ScoreGrade;
   scoreVersion: string;
   confidence: ScoreConfidence;
+  evidenceGrade: EvidenceGrade;
+  marketEvidence: MarketEvidence;
+  provisional: boolean;
   dataCoverage: number;
   dimensions: Record<ScoreDimensionKey, ScoreDimension>;
   verdict: string;

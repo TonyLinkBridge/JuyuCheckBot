@@ -14,6 +14,12 @@ const report = {
   domain: "example.com",
   score: 86,
   grade: "A",
+  scoreVersion: "JUYU-1.3",
+  evidenceGrade: "B",
+  marketEvidence: "limited",
+  provisional: false,
+  confidence: "medium",
+  dataCoverage: 90,
   riskLevel: "low",
   verdict: "简短、清晰，并具备品牌延展能力。",
   strengths: ["简短易记", ".COM 品牌资产", "适合全球化品牌"],
@@ -33,6 +39,8 @@ describe("referral growth messages", () => {
     const shareUrl = keyboard.inline_keyboard[0]?.[0]?.url;
 
     expect(text).toContain("86 / 100");
+    expect(text).toContain("JUYU Structure Score");
+    expect(text).toContain("证据等级　B");
     expect(text).toContain("✓ 简短易记");
     expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
     expect(shareUrl).not.toContain("telegram_user_id");
@@ -45,6 +53,13 @@ describe("referral growth messages", () => {
     expect(text).toContain("朋友分享了一份 JUYU 域名体检");
     expect(text).toContain("现在体检你的域名");
     expect(keyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("start_check");
+  });
+
+  it("labels low-evidence results as provisional instead of presenting false precision", () => {
+    const text = shareCardText({ ...report, evidenceGrade: "D", provisional: true, dataCoverage: 25 });
+
+    expect(text).toContain("暂定结构分");
+    expect(text).toContain("证据等级　D");
   });
 });
 

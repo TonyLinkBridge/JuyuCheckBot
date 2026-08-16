@@ -1,6 +1,7 @@
 import type {
   DnsResult,
   DomainReport,
+  EvidenceGrade,
   RdapResult,
   RiskLevel,
   ScoreConfidence,
@@ -9,7 +10,7 @@ import type {
   ScoreGrade,
 } from "./types.js";
 
-export const SCORE_VERSION = "JUYU-1.2";
+export const SCORE_VERSION = "JUYU-1.3";
 
 type ScoreInput = {
   domain: string;
@@ -26,6 +27,9 @@ type ScoredFields = Pick<
   | "grade"
   | "scoreVersion"
   | "confidence"
+  | "evidenceGrade"
+  | "marketEvidence"
+  | "provisional"
   | "dataCoverage"
   | "dimensions"
   | "verdict"
@@ -38,12 +42,12 @@ type ScoredFields = Pick<
 >;
 
 const weights: Record<ScoreDimensionKey, number> = {
-  brandability: 0.25,
-  memorability: 0.2,
+  brandability: 0.3,
+  memorability: 0.25,
   commercialPotential: 0.2,
   extensionFit: 0.15,
   globalReach: 0.1,
-  marketSignals: 0.1,
+  marketSignals: 0,
 };
 
 export function scoreDomain(input: ScoreInput): ScoredFields {
@@ -115,22 +119,25 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
     (total, dimension) => total + dimension.score * dimension.weight,
     0,
   );
-  const riskPenalty = riskLevel === "high" ? 20 : riskLevel === "medium" ? 10 : 0;
   const normalizedScore = availableWeight > 0 ? weighted / availableWeight : 0;
-  const score = clamp(Math.round(normalizedScore - riskPenalty));
+  const score = clamp(Math.round(normalizedScore));
   const grade = gradeFor(score);
   const dataCoverage = calculateCoverage(input.rdap, input.dns);
-  const confidence: ScoreConfidence =
-    input.rdap.status === "unknown" || dataCoverage < 45 ? "low" : "medium";
+  const evidenceGrade = gradeEvidence(input.rdap, input.dns, dataCoverage);
+  const provisional = evidenceGrade === "D";
+  const confidence: ScoreConfidence = provisional ? "low" : "medium";
 
   return {
     score,
     grade,
     scoreVersion: SCORE_VERSION,
     confidence,
+    evidenceGrade,
+    marketEvidence: "limited",
+    provisional,
     dataCoverage,
     dimensions,
-    verdict: buildVerdict(score, riskLevel),
+    verdict: buildVerdict(score),
     riskLevel,
     riskFlags,
     strengths: unique(strengths),
@@ -229,10 +236,10 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
     ),
     commercialPotential: dimension(
       "commercialPotential",
-      "商业潜力",
+      "商业适配",
       commercialPotential,
       true,
-      "基于结构与后缀通用性，暂未包含成交案例",
+      "只评估结构与后缀适配，不代表真实市场需求",
     ),
     extensionFit: dimension(
       "extensionFit",
@@ -250,12 +257,12 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
     ),
     marketSignals: dimension(
       "marketSignals",
-      "活跃度信号",
+      "基础活跃度",
       marketSignals,
       activityAvailable,
       activityAvailable
-        ? "仅基于域龄与 DNS 活跃度，不代表市场需求或成交表现"
-        : "外部数据不完整，本项暂不参与总分",
+        ? "独立参考，不参与结构总分；不代表市场需求或成交表现"
+        : "基础数据不完整，本项不参与结构总分",
     ),
   };
 }
@@ -308,13 +315,18 @@ function gradeFor(score: number): ScoreGrade {
   return "D";
 }
 
-function buildVerdict(score: number, risk: RiskLevel): string {
-  if (risk === "high") return "基础信号存在明确风险，建议先完成状态与历史尽调。";
-  if (score >= 90) return "结构、发音与基础活跃度突出，具备进一步品牌评估价值。";
+function buildVerdict(score: number): string {
+  if (score >= 90) return "结构、发音与后缀适配突出，具备进一步品牌评估价值。";
   if (score >= 80) return "整体结构清晰，品牌与商业延展条件较好。";
   if (score >= 70) return "具备可用基础，但仍需结合行业语义与价格判断。";
   if (score >= 60) return "基础条件一般，建议重点核对命名成本与应用场景。";
   return "结构或基础信号偏弱，投入前建议进行更严格比较。";
+}
+
+function gradeEvidence(rdap: RdapResult, dns: DnsResult, coverage: number): EvidenceGrade {
+  if (rdap.status !== "unknown" && dns.checked && coverage >= 75) return "B";
+  if (rdap.status !== "unknown" && coverage >= 60) return "C";
+  return "D";
 }
 
 type NameSignals = {

@@ -27,7 +27,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会显示 JUYU Score、等级、品牌力、记忆度、商业潜力和风险。选择你的目的后，订阅 JUYU 情报局即可解锁完整 DATA、JUYU ANALYSIS 与行动建议。
+免费 Preview 会显示 JUYU Structure Score、证据等级、品牌力、记忆度、商业适配和独立风险。选择你的目的后，订阅 JUYU 情报局即可解锁完整 DATA、JUYU ANALYSIS 与行动建议。
 
 常用命令：
 /recent 最近体检
@@ -45,10 +45,10 @@ export function previewReportText(report: DomainReport): string {
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-<b>${report.score} / 100　${report.grade}级</b>
+<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
 
 品牌力　　　 ${barScore(brandability.score)} ${brandability.score}
-商业潜力　　 ${barScore(commercialPotential.score)} ${commercialPotential.score}
+商业适配　　 ${barScore(commercialPotential.score)} ${commercialPotential.score}
 记忆度　　　 ${barScore(memorability.score)} ${memorability.score}
 风险等级　　 ${riskLabel(report.riskLevel)}
 
@@ -56,7 +56,8 @@ export function previewReportText(report: DomainReport): string {
 <b>一句话判断</b>
 ${escapeHtml(report.verdict)}
 
-<i>${report.scoreVersion} · 置信度 ${confidenceLabel(report.confidence)} · 数据覆盖 ${report.dataCoverage}%</i>`;
+<i>${trustLine(report)}
+结构评分不等于估值或成交概率。</i>`;
 }
 
 export const intentPromptText = `为了给你更准确的行动建议：
@@ -76,7 +77,8 @@ export function gateText(config: Config): string {
 
 完整报告包含：
 ✓ DATA｜注册、域龄与 DNS
-✓ 六维 JUYU Domain Score
+✓ 五维 JUYU Structure Score
+✓ 证据等级与基础活跃度参考
 ✓ 核心优势与主要风险
 ✓ 根据你的目的生成行动建议
 
@@ -100,7 +102,7 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
   const dimensionLines = Object.values(report.dimensions)
     .map(
       (item) =>
-        `• ${item.label}：<b>${item.available === false ? "N/A" : item.score}</b>｜${escapeHtml(item.conclusion)}`,
+        `• ${item.label}（${item.weight === 0 ? "参考项" : `${Math.round(item.weight * 100)}%`}）：<b>${item.available === false ? "N/A" : item.score}</b>｜${escapeHtml(item.conclusion)}`,
     )
     .join("\n");
   const strengths = report.strengths.length
@@ -111,7 +113,9 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
   return `🔓 <b>完整 JUYU 域名体检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-<b>${report.score} / 100　${report.grade}级</b>
+<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
+证据等级：<b>${evidenceGrade(report)}</b>
+市场证据：<b>LIMITED</b>｜尚未接入真实成交数据库
 风险等级：${riskLabel(report.riskLevel)}
 
 ━━━━━━━━━━━━━━
@@ -143,9 +147,9 @@ ${risks}
 🎯 <b>ACTION｜建议行动</b>
 ${escapeHtml(actionAdvice(report, intent))}
 
-<i>${report.scoreVersion} · 置信度 ${confidenceLabel(report.confidence)} · 数据覆盖 ${report.dataCoverage}%
+<i>${trustLine(report)}
 体检时间：${formatDateTime(report.checkedAt)}
-商业潜力与活跃度信号暂未包含成交数据库。本报告不构成估值、商标、法律、安全或交易意见。</i>`;
+结构评分只判断名称与后缀条件；基础活跃度独立参考。市场证据尚未包含成交数据库。本报告不构成估值、商标、法律、安全或交易意见。</i>`;
 }
 
 export function fullReportKeyboard(
@@ -184,12 +188,13 @@ export function shareCardText(report: DomainReport): string {
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-<b>${report.score} / 100　${report.grade}级</b>
+<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
 
 品牌力　　${brandability.score}
 记忆度　　${memorability.score}
-商业潜力　${commercialPotential.score}
+商业适配　${commercialPotential.score}
 风险等级　${riskLabel(report.riskLevel)}
+证据等级　${evidenceGrade(report)}
 
 <b>${escapeHtml(report.verdict)}</b>
 
@@ -202,7 +207,7 @@ ${highlights}
 
 export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
   const reportLink = referralLink(config.BOT_USERNAME, token);
-  const shareText = `我刚用 JUYU 体检了 ${report.domain}：${report.score}/100（${report.grade}级）。\n\n你觉得这个域名能做成品牌吗？点开也能免费查你的域名 👇`;
+  const shareText = `我刚用 JUYU 查了 ${report.domain} 的结构评分：${report.score}/100（${report.grade}级）。\n\n这不是估值，你觉得它能做成品牌吗？点开也能免费查你的域名 👇`;
   return new InlineKeyboard()
     .url(
       "📤 分享这份体检",
@@ -217,12 +222,13 @@ export function referralWelcomeText(report: DomainReport): string {
   return `👋 <b>朋友分享了一份 JUYU 域名体检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-<b>${report.score} / 100　${report.grade}级</b>
+<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
 
 品牌力　　 ${brandability.score}
 记忆度　　 ${memorability.score}
-商业潜力　 ${commercialPotential.score}
+商业适配　 ${commercialPotential.score}
 风险等级　 ${riskLabel(report.riskLevel)}
+证据等级　 ${evidenceGrade(report)}
 
 <b>${escapeHtml(report.verdict)}</b>
 
@@ -232,7 +238,7 @@ export function referralWelcomeText(report: DomainReport): string {
 直接发送一个域名，例如：
 <code>yourdomain.com</code>
 
-先免费查看 JUYU Score、品牌潜力与基础风险。`;
+先免费查看域名结构评分、证据等级与基础风险。`;
 }
 
 export function referralWelcomeKeyboard(): InlineKeyboard {
@@ -303,6 +309,9 @@ export function commerceLink(botUsername: string, action: string, domain: string
 }
 
 function actionAdvice(report: DomainReport, intent: DomainIntent): string {
+  if (report.provisional) {
+    return "VERIFY：当前证据等级较低，请先补做注册状态、历史、商标与市场核查，再决定购买、出售或开发。";
+  }
   if (intent === "owner") {
     if (report.score >= 80) return "HOLD / BUILD：保留并完善品牌使用，同时补做商标、历史与成交对标。";
     return "REVIEW：先确认实际使用场景，再决定继续持有、开发或提交出售评估。";
@@ -329,6 +338,25 @@ function riskLabel(level: RiskLevel): string {
 
 function confidenceLabel(confidence: DomainReport["confidence"]): string {
   return confidence === "medium" ? "中" : "低";
+}
+
+function scoreLabel(report: DomainReport): string {
+  if (report.scoreVersion !== "JUYU-1.3") return "JUYU Score（旧版）";
+  return report.provisional ? "暂定结构分" : "JUYU Structure Score";
+}
+
+function evidenceGrade(report: DomainReport): DomainReport["evidenceGrade"] {
+  if (report.evidenceGrade) return report.evidenceGrade;
+  if (report.dataCoverage >= 75) return "B";
+  if (report.dataCoverage >= 60) return "C";
+  return "D";
+}
+
+function trustLine(report: DomainReport): string {
+  if (report.scoreVersion !== "JUYU-1.3") {
+    return `${report.scoreVersion || "旧版"} · 旧版综合分 · 重新体检可获得新版结构评分`;
+  }
+  return `${report.scoreVersion} · 证据等级 ${evidenceGrade(report)} · 置信度 ${confidenceLabel(report.confidence)} · 数据覆盖 ${report.dataCoverage}% · 市场证据 LIMITED`;
 }
 
 function barScore(score: number): string {

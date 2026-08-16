@@ -1,5 +1,7 @@
 import "server-only";
 
+const CURRENT_SCORE_VERSION = "JUYU-1.3";
+
 export const rangeOptions = [
   { value: "1d", label: "24H", days: 1 },
   { value: "7d", label: "7D", days: 7 },
@@ -280,6 +282,7 @@ function buildDashboard(
   const gateUnlocked = [...gateTokens].filter((token) => unlockedTokens.has(token)).length;
   const recovered = [...failedTokens].filter((token) => unlockedTokens.has(token)).length;
   const currentReports = reports.filter((report) => new Date(report.created_at) >= currentStart);
+  const currentStructureReports = currentReports.filter((report) => report.score_version === CURRENT_SCORE_VERSION);
   const previewEvents = current.filter((event) => event.event_name === "preview_shown");
   const durations = previewEvents
     .map((event) => numericMetadata(event, "durationMs"))
@@ -323,14 +326,14 @@ function buildDashboard(
     sources: buildSources(current),
     quality: {
       reportCount: currentReports.length,
-      averageScore: average(currentReports.map((report) => Number(report.score)).filter(Number.isFinite)),
+      averageScore: average(currentStructureReports.map((report) => Number(report.score)).filter(Number.isFinite)),
       lowConfidenceRate: ratio(
-        currentReports.filter((report) => report.confidence === "low").length,
-        currentReports.length,
+        currentStructureReports.filter((report) => report.confidence === "low").length,
+        currentStructureReports.length,
       ),
       unavailableRate: ratio(
-        currentReports.filter((report) => activityUnavailable(report.report)).length,
-        currentReports.length,
+        currentStructureReports.filter((report) => activityUnavailable(report.report)).length,
+        currentStructureReports.length,
       ),
       cachedRate: ratio(
         previewEvents.filter((event) => event.metadata?.cached === true).length,

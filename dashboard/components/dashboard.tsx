@@ -448,10 +448,10 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
 
 function QualityGrid({ quality }: { quality: DashboardData["quality"] }) {
   const items = [
-    { label: "体检报告", value: String(quality.reportCount), hint: `Reports · 平均分 ${quality.averageScore.toFixed(1)}`, icon: Bot, tone: "neutral" },
+    { label: "体检报告", value: String(quality.reportCount), hint: `Reports · JUYU-1.3 平均结构分 ${quality.averageScore.toFixed(1)}`, icon: Bot, tone: "neutral" },
     { label: "响应中位数", value: quality.medianDurationMs ? `${(quality.medianDurationMs / 1000).toFixed(1)}s` : "—", hint: "Median latency · Preview", icon: Clock3, tone: quality.medianDurationMs > 6000 ? "warn" : "good" },
     { label: "低置信报告", value: formatPercent(quality.lowConfidenceRate), hint: "Low confidence · 数据覆盖", icon: Gauge, tone: quality.lowConfidenceRate > 0.15 ? "warn" : "good" },
-    { label: "市场数据缺失", value: formatPercent(quality.unavailableRate), hint: "Activity N/A · 不计分", icon: Database, tone: quality.unavailableRate > 0.1 ? "warn" : "good" },
+    { label: "基础活跃度缺失", value: formatPercent(quality.unavailableRate), hint: "Reference only · 不参与结构分", icon: Database, tone: quality.unavailableRate > 0.1 ? "warn" : "good" },
     { label: "缓存命中", value: formatPercent(quality.cachedRate), hint: "Cache hit · 15 分钟复用", icon: RefreshCw, tone: "neutral" },
     { label: "体检失败", value: formatPercent(quality.failureRate), hint: "Check failures · 提交→失败", icon: quality.failureRate > 0 ? XCircle : CheckCircle2, tone: quality.failureRate > 0.05 ? "bad" : "good" },
   ];

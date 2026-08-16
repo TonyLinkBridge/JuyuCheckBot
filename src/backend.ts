@@ -404,8 +404,19 @@ function reviveDomainReport(value: unknown): DomainReport | null {
   if (!checkedAt) return null;
 
   const rdap = value.rdap;
+  const dataCoverage = typeof value.dataCoverage === "number" ? value.dataCoverage : 0;
+  const evidenceGrade = isEvidenceGrade(value.evidenceGrade)
+    ? value.evidenceGrade
+    : dataCoverage >= 75
+      ? "B"
+      : dataCoverage >= 60
+        ? "C"
+        : "D";
   return {
     ...(value as unknown as DomainReport),
+    evidenceGrade,
+    marketEvidence: "limited",
+    provisional: typeof value.provisional === "boolean" ? value.provisional : evidenceGrade === "D",
     checkedAt,
     rdap: {
       ...(rdap as unknown as DomainReport["rdap"]),
@@ -414,6 +425,10 @@ function reviveDomainReport(value: unknown): DomainReport | null {
       updatedAt: reviveNullableDate(rdap.updatedAt),
     },
   };
+}
+
+function isEvidenceGrade(value: unknown): value is DomainReport["evidenceGrade"] {
+  return value === "A" || value === "B" || value === "C" || value === "D";
 }
 
 function reviveNullableDate(value: unknown): Date | null {
