@@ -118,7 +118,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .notice-banner { display: flex; align-items: center; gap: 9px; margin-bottom: 24px; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--amber) 25%, transparent); border-radius: 9px; color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, transparent); font-size: 12px; }
 .section-block { scroll-margin-top: 98px; margin-top: 52px; }
 .section-block:first-of-type { margin-top: 0; }
-.section-last { margin-bottom: 20px; }
+.section-last { min-height: calc(100vh - 118px); margin-bottom: 0; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 17px; }
 .section-heading p, .card-kicker { margin: 0 0 6px; color: var(--text-faint); font-family: var(--font-geist-mono); font-size: 9px; font-weight: 600; letter-spacing: .13em; }
 .section-heading h2 { margin: 0; color: var(--text-strong); font-size: 20px; font-weight: 560; letter-spacing: -.025em; }
@@ -248,6 +248,7 @@ tbody tr:hover td { background: var(--row-hover); }
   .topbar { position: relative; top: auto; height: auto; min-height: 70px; padding: 12px 18px; }
   .topbar-subtitle { display: none; }.dashboard-content { padding: 26px 18px 64px; }
   .section-block { scroll-margin-top: 112px; }
+  .section-last { min-height: calc(100vh - 132px); }
   .analytics-grid { grid-template-columns: 1fr; }.trend-card, .gate-card { min-height: 350px; }
 }
 
