@@ -1,6 +1,6 @@
 {
   "name": "juyu-domain-check-bot",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "JUYU 域名体检 Telegram Growth Bot",
   "type": "module",
@@ -11,7 +11,10 @@
     "webhook:set": "tsx scripts/set-webhook.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dashboard:dev": "npm --prefix dashboard run dev",
+    "dashboard:build": "npm --prefix dashboard run build",
+    "dashboard:typecheck": "npm --prefix dashboard run typecheck"
   },
   "engines": {
     "node": "22.x"

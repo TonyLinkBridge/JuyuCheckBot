@@ -28,6 +28,7 @@
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - `JUYU-1.2` 对 RDAP / DNS 临时失败执行重试；缺失的活跃度数据不参与总分，只降低置信度
 - 推荐打开按独立用户计数，最近报告按域名去重
+- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、来源质量、Growth Gate 与数据健康监控
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
 ## 本地启动
@@ -79,6 +80,30 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    ```bash
    npm run webhook:set -- https://你的稳定正式域名
    ```
+
+## Growth Dashboard
+
+Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但作为独立 Vercel Project 部署，避免界面变更影响 Webhook。
+
+- 技术：Next.js、shadcn 风格组件、Tremor/Recharts 图表、Tailwind CSS、Geist
+- 数据：只在服务器端使用 Supabase Service Role，浏览器只接收聚合指标
+- 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
+- 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate
+- 分析：新用户 Cohort Funnel、Growth Gate 转化、来源质量、报告质量与最近活动
+
+第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+DASHBOARD_PASSWORD=至少12位的独立强密码
+```
+
+本地运行：
+
+```bash
+npm run dashboard:dev
+```
 
    该命令会同时设置 Bot 命令菜单，并把 Telegram Webhook 指向 `/telegram/webhook`。以后只有正式域名或 Secret 改变时才需重跑。
 

@@ -5,6 +5,7 @@ export type GrowthEventName =
   | "bot_started"
   | "user_created"
   | "domain_submitted"
+  | "check_failed"
   | "rate_limited"
   | "preview_shown"
   | "intent_selected"

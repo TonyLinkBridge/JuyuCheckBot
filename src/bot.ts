@@ -318,6 +318,7 @@ export function createBot(config: Config): Bot {
 
     const userId = ctx.from?.id;
     if (!userId) return;
+    const checkStartedAt = Date.now();
     const source = attribution.get(userId);
     const rateLimit = await backend.checkRateLimit(userId);
     if (!rateLimit.allowed) {
@@ -341,21 +342,27 @@ export function createBot(config: Config): Bot {
       domain: domain.ascii,
     });
     const progress = await ctx.reply(checkingText(domain.ascii), html);
+    let report: DomainReport;
+    let cached = false;
     try {
-      const cached = await backend.getRecentReport(domain.ascii, SCORE_VERSION, reportCacheMs);
-      const [report] = await Promise.all([
-        cached ? Promise.resolve(cached) : checkDomain(domain, config.CHECK_TIMEOUT_MS),
+      const cachedReport = await backend.getRecentReport(domain.ascii, SCORE_VERSION, reportCacheMs);
+      cached = Boolean(cachedReport);
+      [report] = await Promise.all([
+        cachedReport ? Promise.resolve(cachedReport) : checkDomain(domain, config.CHECK_TIMEOUT_MS),
         submittedEvent,
       ]);
       const token = reports.put(userId, report);
       const persisted = await backend.saveReport({ reportToken: token, telegramUserId: userId, source, report });
       if (backend.enabled && !persisted) throw new Error("Report persistence failed");
-      await ctx.api.editMessageText(
-        ctx.chat!.id,
-        progress.message_id,
-        `${previewReportText(report)}\n\n${intentPromptText}`,
-        { ...html, reply_markup: intentKeyboard(token) },
-      );
+      const preview = `${previewReportText(report)}\n\n${intentPromptText}`;
+      try {
+        await ctx.api.editMessageText(ctx.chat!.id, progress.message_id, preview, {
+          ...html,
+          reply_markup: intentKeyboard(token),
+        });
+      } catch {
+        await ctx.reply(preview, { ...html, reply_markup: intentKeyboard(token) });
+      }
       await backend.track({
         eventName: "preview_shown",
         telegramUserId: userId,
@@ -366,16 +373,30 @@ export function createBot(config: Config): Bot {
           score: report.score,
           grade: report.grade,
           scoreVersion: report.scoreVersion,
-          cached: Boolean(cached),
+          cached,
+          confidence: report.confidence,
+          dataCoverage: report.dataCoverage,
+          durationMs: Date.now() - checkStartedAt,
         },
       });
     } catch (error) {
       console.error(`Domain check failed for ${domain.ascii}`, error instanceof Error ? error.message : "unknown error");
-      await ctx.api.editMessageText(
-        ctx.chat!.id,
-        progress.message_id,
-        "⚠️ 体检服务暂时繁忙，请稍后再试，或发送另一个域名。",
-      );
+      await backend.track({
+        eventName: "check_failed",
+        telegramUserId: userId,
+        source,
+        domain: domain.ascii,
+        metadata: {
+          durationMs: Date.now() - checkStartedAt,
+          stage: "report_generation",
+        },
+      });
+      const failureText = "⚠️ 体检服务暂时繁忙，请稍后再试，或发送另一个域名。";
+      try {
+        await ctx.api.editMessageText(ctx.chat!.id, progress.message_id, failureText);
+      } catch {
+        await ctx.reply(failureText, html);
+      }
     }
   }
 
