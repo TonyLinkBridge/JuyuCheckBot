@@ -9,10 +9,12 @@ JUYU 域名体检的内部增长控制台。
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+COMMERCE_SUPABASE_URL
+COMMERCE_SUPABASE_SECRET_KEY
 DASHBOARD_PASSWORD
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` 只允许存在于服务器环境。Dashboard 不会把 Telegram 用户 ID 或 Service Role 传给浏览器。
+前两项连接 `@JuyuCheckBot`，`COMMERCE_` 两项连接独立的 `@JuyuDomainBot` Supabase。Secret Key 只允许存在于服务器环境。Dashboard 只在服务器端用 Telegram 用户 ID 匹配跨 Bot 转化，不会把 ID、用户名、联系方式或数据库密钥传给浏览器。
 
 ## Deploy
 

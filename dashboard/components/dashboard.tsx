@@ -402,18 +402,22 @@ function ReferralLoop({ referral }: { referral: DashboardData["referral"] }) {
 function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
   const metrics = [
     { label: "商业意向用户", value: String(leads.commercialIntentUsers), hint: "Owner + Buyer" },
-    { label: "想购买", value: String(leads.buyerUsers), hint: "Buyer intent" },
-    { label: "想出售", value: String(leads.ownerUsers), hint: "Owner intent" },
-    { label: "助手导流率", value: formatPercent(leads.handoffRate), hint: `${leads.handoffUsers} users handed off` },
+    { label: "进入聚域助手", value: String(leads.handoffUsers), hint: `${formatPercent(leads.handoffRate)} of commercial intent` },
+    { label: "完成资料提交", value: String(leads.submittedUsers), hint: `${leads.submittedLeads} completed lead forms` },
+    { label: "Lead 完成率", value: formatPercent(leads.completionRate), hint: `购买 ${leads.buyLeads} · 出售 ${leads.sellLeads} · 注册 ${leads.registerLeads}` },
   ];
   return (
     <>
+      {!leads.commerceConfigured || leads.commerceError ? <div className="lead-connection-notice">
+        <Database size={15} aria-hidden="true" />
+        <span>{leads.commerceError ?? "尚未连接 Commerce Supabase；目前只显示意向与导流点击。"}</span>
+      </div> : null}
       <div className="lead-metrics">
         {metrics.map((metric) => <Card key={metric.label} className="lead-metric-card"><CardContent><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.hint}</small></CardContent></Card>)}
       </div>
       <div className="lead-grid">
         <Card className="lead-opportunities-card">
-          <CardHeader><div><p className="card-kicker">OPPORTUNITIES</p><h2>潜在客户列表 <small>Lead opportunities</small></h2></div><Briefcase size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
+          <CardHeader><div><p className="card-kicker">OPPORTUNITIES</p><h2>潜在客户列表 <small>Lead opportunities</small></h2></div>{leads.commerceConfigured && !leads.commerceError ? <Badge className="commerce-connected">COMMERCE CONNECTED</Badge> : <Briefcase size={18} className="muted-icon" aria-hidden="true" />}</CardHeader>
           <CardContent className="table-wrap">
             <table>
               <thead><tr><th>优先级</th><th>域名</th><th>意图</th><th>操作</th><th>评分</th><th>来源</th><th>状态</th></tr></thead>
@@ -424,7 +428,7 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
                 <td>{leadActionLabel(lead.action)}</td>
                 <td>{lead.score === null ? "—" : `${lead.score}${lead.grade ? ` · ${lead.grade}` : ""}`}</td>
                 <td><Badge>{lead.source}</Badge></td>
-                <td><span className={cn("lead-status", lead.handedOff && "handed-off")}><i />{lead.handedOff ? "已进入助手" : "待行动"}</span></td>
+                <td><span className={cn("lead-status", lead.handedOff && "handed-off", lead.submitted && "submitted")}><i />{lead.submitted ? leadStatusLabel(lead.leadStatus) : lead.handedOff ? "已进入助手" : "待行动"}</span></td>
               </tr>) : <tr><td colSpan={7} className="empty-cell">用户选择购买或出售意图后显示</td></tr>}</tbody>
             </table>
           </CardContent>
@@ -432,8 +436,8 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
         <Card className="lead-sources-card">
           <CardHeader><div><p className="card-kicker">LEAD SOURCES</p><h2>客户来源 <small>Commercial attribution</small></h2></div><Fingerprint size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
           <CardContent className="table-wrap">
-            <table><thead><tr><th>来源</th><th>意向</th><th>导流</th><th>转化</th></tr></thead><tbody>
-              {leads.sources.length ? leads.sources.map((source) => <tr key={source.source}><td><span className="source-name">{source.source}</span></td><td>{source.intents}</td><td>{source.handoffs}</td><td>{formatPercent(source.handoffRate)}</td></tr>) : <tr><td colSpan={4} className="empty-cell">等待商业意向数据</td></tr>}
+            <table><thead><tr><th>来源</th><th>意向</th><th>导流</th><th>提交</th><th>完成率</th></tr></thead><tbody>
+              {leads.sources.length ? leads.sources.map((source) => <tr key={source.source}><td><span className="source-name">{source.source}</span></td><td>{source.intents}</td><td>{source.handoffs}</td><td>{source.submitted}</td><td>{formatPercent(source.completionRate)}</td></tr>) : <tr><td colSpan={5} className="empty-cell">等待商业意向数据</td></tr>}
             </tbody></table>
           </CardContent>
         </Card>
@@ -494,4 +498,5 @@ function formatPercent(value: number): string { return `${(value * 100).toFixed(
 function ratio(numerator: number, denominator: number): number { return denominator > 0 ? numerator / denominator : 0; }
 function priorityLabel(priority: "high" | "medium" | "low"): string { return priority === "high" ? "高" : priority === "medium" ? "中" : "低"; }
 function leadActionLabel(action: "sell" | "buy" | "register"): string { return action === "sell" ? "出售评估" : action === "register" ? "协助注册" : "协助收购"; }
+function leadStatusLabel(status: string | null): string { return status === "qualified" ? "合格客户" : status === "won" ? "已成交" : status === "lost" ? "已关闭" : status === "contacted" ? "已联系" : "已提交资料"; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Kuala_Lumpur", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }

@@ -92,12 +92,15 @@ Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但�
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
 - 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
 - 分析：新用户 Cohort Funnel、Referral Funnel、Lead Conversion、Growth Gate 转化、来源质量、报告质量与最近活动
+- 双 Supabase：Dashboard 可在服务器端匹配 Check Bot 导流与 Commerce Bot 已完成 Lead，浏览器不接收 Telegram ID 或联系方式
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+COMMERCE_SUPABASE_URL
+COMMERCE_SUPABASE_SECRET_KEY
 DASHBOARD_PASSWORD=至少12位的独立强密码
 ```
 

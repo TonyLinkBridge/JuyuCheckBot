@@ -225,6 +225,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .lead-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 8%, transparent); }
 .lead-status.handed-off { color: var(--green); }
 .lead-status.handed-off i { background: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
+.lead-status.handed-off:not(.submitted) { color: var(--amber); }
+.lead-status.handed-off:not(.submitted) i { background: var(--amber); box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 8%, transparent); }
+.lead-status.submitted { color: var(--green); }
+.lead-status.submitted i { background: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
+.lead-connection-notice { min-height: 38px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--amber) 24%, var(--border)); border-radius: 8px; color: var(--amber); background: color-mix(in srgb, var(--amber) 6%, transparent); font-size: 10px; }
+.commerce-connected { color: var(--green); border-color: color-mix(in srgb, var(--green) 28%, transparent); background: var(--green-dim); }
 
 .source-grid { display: grid; grid-template-columns: minmax(300px, .75fr) minmax(520px, 1.25fr); gap: 12px; }
 .source-chart-content { height: 300px; }.source-chart { width: 100%; height: 100%; }

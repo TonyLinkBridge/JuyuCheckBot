@@ -31,6 +31,15 @@ type ReportRow = {
   created_at: string;
 };
 
+type CommerceLeadRow = {
+  id: number;
+  lead_type: "buy" | "sell" | "contact";
+  telegram_user_id: number;
+  data: Record<string, unknown> | null;
+  status: string;
+  created_at: string;
+};
+
 export type Metric = {
   value: number;
   previous: number;
@@ -78,11 +87,19 @@ export type DashboardData = {
     }>;
   };
   leads: {
+    commerceConfigured: boolean;
+    commerceError: string | null;
     commercialIntentUsers: number;
     buyerUsers: number;
     ownerUsers: number;
     handoffUsers: number;
     handoffRate: number;
+    submittedUsers: number;
+    submittedLeads: number;
+    completionRate: number;
+    buyLeads: number;
+    sellLeads: number;
+    registerLeads: number;
     opportunities: Array<{
       domain: string;
       intent: "owner" | "buyer";
@@ -91,6 +108,8 @@ export type DashboardData = {
       grade: string | null;
       source: string;
       handedOff: boolean;
+      submitted: boolean;
+      leadStatus: string | null;
       priority: "high" | "medium" | "low";
       createdAt: string;
     }>;
@@ -98,7 +117,9 @@ export type DashboardData = {
       source: string;
       intents: number;
       handoffs: number;
+      submitted: number;
       handoffRate: number;
+      completionRate: number;
     }>;
   };
   trend: Array<{
@@ -148,8 +169,23 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
 
   const currentStart = new Date(now.getTime() - option.days * 86_400_000);
   const queryStart = new Date(now.getTime() - option.days * 2 * 86_400_000);
+  const commerceUrl = process.env.COMMERCE_SUPABASE_URL?.replace(/\/$/, "");
+  const commerceKey = process.env.COMMERCE_SUPABASE_SECRET_KEY;
+  const commerceConfigured = Boolean(commerceUrl && commerceKey);
   try {
-    const [events, reports] = await Promise.all([
+    const commerceRead = commerceUrl && commerceKey
+      ? readAll<CommerceLeadRow>(commerceUrl, commerceKey, "leads", {
+          select: "id,lead_type,telegram_user_id,data,status,created_at",
+          created_at: `gte.${currentStart.toISOString()}`,
+          order: "created_at.asc",
+        })
+          .then((rows) => ({ rows, error: null as string | null }))
+          .catch((error) => {
+            console.error("Commerce leads load failed", error instanceof Error ? error.message : "unknown error");
+            return { rows: [] as CommerceLeadRow[], error: "Commerce Supabase 暂时无法读取" };
+          })
+      : Promise.resolve({ rows: [] as CommerceLeadRow[], error: null as string | null });
+    const [events, reports, commerce] = await Promise.all([
       readAll<GrowthEvent>(url, key, "growth_events", {
         select: "event_name,telegram_user_id,source,domain,report_token,intent,metadata,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
@@ -160,8 +196,20 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         created_at: `gte.${queryStart.toISOString()}`,
         order: "created_at.asc",
       }),
+      commerceRead,
     ]);
-    return buildDashboard(range, option.days, now, currentStart, queryStart, events, reports);
+    return buildDashboard(
+      range,
+      option.days,
+      now,
+      currentStart,
+      queryStart,
+      events,
+      reports,
+      commerce.rows,
+      commerceConfigured,
+      commerce.error,
+    );
   } catch (error) {
     console.error("Growth dashboard data load failed", error instanceof Error ? error.message : "unknown error");
     return { ...empty, configured: true, error: "暂时无法读取增长数据" };
@@ -203,6 +251,9 @@ function buildDashboard(
   previousStart: Date,
   events: GrowthEvent[],
   reports: ReportRow[],
+  commerceLeads: CommerceLeadRow[],
+  commerceConfigured: boolean,
+  commerceError: string | null,
 ): DashboardData {
   const current = events.filter((event) => new Date(event.created_at) >= currentStart);
   const previous = events.filter((event) => {
@@ -267,7 +318,7 @@ function buildDashboard(
       recoveryRate: ratio(recovered, failedTokens.size),
     },
     referral: buildReferral(current),
-    leads: buildLeads(current),
+    leads: buildLeads(current, commerceLeads, commerceConfigured, commerceError),
     trend: buildTrend(current, currentStart, now, days),
     sources: buildSources(current),
     quality: {
@@ -402,7 +453,12 @@ function buildReferral(events: GrowthEvent[]): DashboardData["referral"] {
   };
 }
 
-function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
+function buildLeads(
+  events: GrowthEvent[],
+  commerceLeads: CommerceLeadRow[],
+  commerceConfigured: boolean,
+  commerceError: string | null,
+): DashboardData["leads"] {
   const intentEvents = events.filter(
     (event) => event.event_name === "intent_selected" && (event.intent === "owner" || event.intent === "buyer"),
   );
@@ -411,6 +467,21 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
   const buyerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "buyer").map((event) => event.telegram_user_id));
   const ownerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "owner").map((event) => event.telegram_user_id));
   const handoffUsers = new Set(handoffEvents.map((event) => event.telegram_user_id));
+  const checkBotLeads = commerceLeads.filter((lead) => {
+    const source = stringData(lead.data, "source");
+    const handoffSource = stringData(lead.data, "handoff_source");
+    return source === "juyu_check_bot" || handoffSource === "juyu_check_bot";
+  });
+  const submittedUsers = new Set(checkBotLeads.map((lead) => lead.telegram_user_id));
+  const completedHandoffUsers = intersectionSet(handoffUsers, submittedUsers);
+  const commerceByUserDomain = new Map<string, CommerceLeadRow>();
+  for (const lead of checkBotLeads) {
+    const domain = stringData(lead.data, "domain");
+    if (!domain) continue;
+    const key = `${lead.telegram_user_id}:${domain}`;
+    const existing = commerceByUserDomain.get(key);
+    if (!existing || new Date(lead.created_at) > new Date(existing.created_at)) commerceByUserDomain.set(key, lead);
+  }
   const handoffByToken = new Map(
     handoffEvents.filter((event) => event.report_token).map((event) => [event.report_token as string, event]),
   );
@@ -429,6 +500,7 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
     const gradeValue = (handoff ?? preview ?? event).metadata?.grade;
     const grade = typeof gradeValue === "string" ? gradeValue : null;
     const action = leadAction(event.intent, handoff?.metadata?.action, handoff?.metadata?.registrationStatus);
+    const submittedLead = commerceByUserDomain.get(`${event.telegram_user_id}:${event.domain}`);
     opportunities.set(event.report_token, {
       domain: event.domain,
       intent: event.intent,
@@ -437,8 +509,10 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
       grade,
       source: event.source,
       handedOff: Boolean(handoff),
-      priority: leadPriority(event.intent, score, Boolean(handoff)),
-      createdAt: handoff?.created_at ?? event.created_at,
+      submitted: Boolean(submittedLead),
+      leadStatus: submittedLead?.status ?? null,
+      priority: leadPriority(event.intent, score, Boolean(handoff), Boolean(submittedLead)),
+      createdAt: submittedLead?.created_at ?? handoff?.created_at ?? event.created_at,
     });
   }
 
@@ -446,6 +520,7 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
     if (!event.report_token || opportunities.has(event.report_token) || !event.domain || (event.intent !== "owner" && event.intent !== "buyer")) continue;
     const score = numericMetadata(event, "score");
     const gradeValue = event.metadata?.grade;
+    const submittedLead = commerceByUserDomain.get(`${event.telegram_user_id}:${event.domain}`);
     opportunities.set(event.report_token, {
       domain: event.domain,
       intent: event.intent,
@@ -454,28 +529,43 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
       grade: typeof gradeValue === "string" ? gradeValue : null,
       source: event.source,
       handedOff: true,
-      priority: leadPriority(event.intent, score, true),
-      createdAt: event.created_at,
+      submitted: Boolean(submittedLead),
+      leadStatus: submittedLead?.status ?? null,
+      priority: leadPriority(event.intent, score, true, Boolean(submittedLead)),
+      createdAt: submittedLead?.created_at ?? event.created_at,
     });
   }
 
-  const sourceMap = new Map<string, { intentUsers: Set<number>; handoffUsers: Set<number> }>();
+  const sourceMap = new Map<string, { intentUsers: Set<number>; handoffUsers: Set<number>; submittedUsers: Set<number> }>();
   for (const event of [...intentEvents, ...handoffEvents]) {
-    const item = sourceMap.get(event.source) ?? { intentUsers: new Set<number>(), handoffUsers: new Set<number>() };
+    const item = sourceMap.get(event.source) ?? {
+      intentUsers: new Set<number>(),
+      handoffUsers: new Set<number>(),
+      submittedUsers: new Set<number>(),
+    };
     if (event.event_name === "intent_selected") item.intentUsers.add(event.telegram_user_id);
     if (event.event_name === "commerce_handoff") {
       item.intentUsers.add(event.telegram_user_id);
       item.handoffUsers.add(event.telegram_user_id);
+      if (submittedUsers.has(event.telegram_user_id)) item.submittedUsers.add(event.telegram_user_id);
     }
     sourceMap.set(event.source, item);
   }
 
   return {
+    commerceConfigured,
+    commerceError,
     commercialIntentUsers: intentUsers.size,
     buyerUsers: buyerUsers.size,
     ownerUsers: ownerUsers.size,
     handoffUsers: handoffUsers.size,
     handoffRate: ratio(handoffUsers.size, intentUsers.size),
+    submittedUsers: submittedUsers.size,
+    submittedLeads: checkBotLeads.length,
+    completionRate: ratio(completedHandoffUsers.size, handoffUsers.size),
+    buyLeads: checkBotLeads.filter((lead) => lead.lead_type === "buy" && stringData(lead.data, "service") !== "register").length,
+    sellLeads: checkBotLeads.filter((lead) => lead.lead_type === "sell").length,
+    registerLeads: checkBotLeads.filter((lead) => stringData(lead.data, "service") === "register").length,
     opportunities: [...opportunities.values()]
       .sort((left, right) => leadPriorityRank(right.priority) - leadPriorityRank(left.priority) || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
       .slice(0, 12),
@@ -484,7 +574,9 @@ function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
         source,
         intents: value.intentUsers.size,
         handoffs: value.handoffUsers.size,
+        submitted: value.submittedUsers.size,
         handoffRate: ratio(value.handoffUsers.size, value.intentUsers.size),
+        completionRate: ratio(value.submittedUsers.size, value.handoffUsers.size),
       }))
       .sort((left, right) => right.handoffs - left.handoffs || right.intents - left.intents),
   };
@@ -550,8 +642,13 @@ function leadAction(
   return "buy";
 }
 
-function leadPriority(intent: "owner" | "buyer", score: number | null, handedOff: boolean): "high" | "medium" | "low" {
-  const points = (handedOff ? 3 : 0) + (intent === "buyer" ? 2 : 1) + ((score ?? 0) >= 80 ? 2 : (score ?? 0) >= 65 ? 1 : 0);
+function leadPriority(
+  intent: "owner" | "buyer",
+  score: number | null,
+  handedOff: boolean,
+  submitted: boolean,
+): "high" | "medium" | "low" {
+  const points = (submitted ? 4 : handedOff ? 3 : 0) + (intent === "buyer" ? 2 : 1) + ((score ?? 0) >= 80 ? 2 : (score ?? 0) >= 65 ? 1 : 0);
   if (points >= 5) return "high";
   if (points >= 3) return "medium";
   return "low";
@@ -584,6 +681,11 @@ function median(values: number[]): number {
 function numericMetadata(event: GrowthEvent, key: string): number | null {
   const value = event.metadata?.[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringData(data: Record<string, unknown> | null, key: string): string {
+  const value = data?.[key];
+  return typeof value === "string" ? value : "";
 }
 
 function activityUnavailable(report: Record<string, unknown>): boolean {
@@ -628,11 +730,19 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       topDomains: [],
     },
     leads: {
+      commerceConfigured: false,
+      commerceError: null,
       commercialIntentUsers: 0,
       buyerUsers: 0,
       ownerUsers: 0,
       handoffUsers: 0,
       handoffRate: 0,
+      submittedUsers: 0,
+      submittedLeads: 0,
+      completionRate: 0,
+      buyLeads: 0,
+      sellLeads: 0,
+      registerLeads: 0,
       opportunities: [],
       sources: [],
     },
