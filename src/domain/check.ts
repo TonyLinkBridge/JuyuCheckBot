@@ -1,20 +1,20 @@
-import { checkDns } from "./dns.js";
+import { checkDnsWithRetry, emptyDnsResult } from "./dns.js";
 import type { DomainReport } from "./types.js";
 import type { NormalizedDomain } from "./normalize.js";
-import { checkRdap, unknownRdap } from "./rdap.js";
+import { checkRdapWithRetry, unknownRdap } from "./rdap.js";
 import { scoreDomain } from "./score.js";
 
 export async function checkDomain(input: NormalizedDomain, timeoutMs: number): Promise<DomainReport> {
   const [rdapResult, dnsResult] = await Promise.allSettled([
-    checkRdap(input.registrableDomain, timeoutMs),
-    checkDns(input.ascii, timeoutMs),
+    checkRdapWithRetry(input.registrableDomain, timeoutMs),
+    checkDnsWithRetry(input.ascii, timeoutMs),
   ]);
 
   const rdap = rdapResult.status === "fulfilled" ? rdapResult.value : unknownRdap();
   const dns =
     dnsResult.status === "fulfilled"
       ? dnsResult.value
-      : { resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] };
+      : emptyDnsResult();
   const scored = scoreDomain({
     domain: input.ascii,
     registrableDomain: input.registrableDomain,

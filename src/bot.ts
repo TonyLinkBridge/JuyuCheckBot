@@ -75,16 +75,22 @@ export function createBot(config: Config): Bot {
       const referralToken = payload.slice("ref_".length);
       const shared = referralToken ? await backend.getReferralReport(referralToken) : null;
       if (shared) {
+        const alreadyRecorded = await backend.hasReferralOpen(userId);
+        const referralEvents = alreadyRecorded
+          ? []
+          : [
+              backend.track({
+                eventName: "referral_opened" as const,
+                telegramUserId: userId,
+                source,
+                domain: shared.report.domain,
+                reportToken: referralToken,
+                metadata: { referrerUserId: shared.telegramUserId, isNew: identity.isNew },
+              }),
+            ];
         await Promise.all([
           ...startEvents,
-          backend.track({
-            eventName: "referral_opened",
-            telegramUserId: userId,
-            source,
-            domain: shared.report.domain,
-            reportToken: referralToken,
-            metadata: { referrerUserId: shared.telegramUserId, isNew: identity.isNew },
-          }),
+          ...referralEvents,
           runCheck(ctx, shared.report.domain),
         ]);
         return;

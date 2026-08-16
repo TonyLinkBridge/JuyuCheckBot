@@ -9,7 +9,7 @@ import type {
   ScoreGrade,
 } from "./types.js";
 
-export const SCORE_VERSION = "JUYU-1.1";
+export const SCORE_VERSION = "JUYU-1.2";
 
 type ScoreInput = {
   domain: string;
@@ -77,7 +77,7 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
     else if (daysToExpiry >= 365) strengths.push("注册有效期超过 1 年");
   }
   if (input.dns.resolves) strengths.push("DNS 解析正常");
-  else if (input.rdap.status === "registered") riskFlags.push("已注册但未发现有效 DNS 解析");
+  else if (input.dns.checked && input.rdap.status === "registered") riskFlags.push("已注册但未发现有效 DNS 解析");
   if (input.rdap.dnssec === true) strengths.push("已启用 DNSSEC");
   if (input.isIdn) riskFlags.push("国际化域名需核对字符混淆与钓鱼风险");
 
@@ -109,12 +109,15 @@ export function scoreDomain(input: ScoreInput): ScoredFields {
     ageYears,
     language,
   });
-  const weighted = Object.values(dimensions).reduce(
+  const availableDimensions = Object.values(dimensions).filter((dimension) => dimension.available);
+  const availableWeight = availableDimensions.reduce((total, dimension) => total + dimension.weight, 0);
+  const weighted = availableDimensions.reduce(
     (total, dimension) => total + dimension.score * dimension.weight,
     0,
   );
-  const riskPenalty = riskLevel === "high" ? 20 : riskLevel === "medium" ? 10 : riskLevel === "unknown" ? 6 : 0;
-  const score = clamp(Math.round(weighted - riskPenalty));
+  const riskPenalty = riskLevel === "high" ? 20 : riskLevel === "medium" ? 10 : 0;
+  const normalizedScore = availableWeight > 0 ? weighted / availableWeight : 0;
+  const score = clamp(Math.round(normalizedScore - riskPenalty));
   const grade = gradeFor(score);
   const dataCoverage = calculateCoverage(input.rdap, input.dns);
   const confidence: ScoreConfidence =
@@ -150,6 +153,7 @@ type DimensionInput = {
 };
 
 function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, ScoreDimension> {
+  const activityAvailable = input.rdap.status !== "unknown" && input.dns.checked;
   let brandability = 45;
   if (input.name.length <= 6) brandability += 25;
   else if (input.name.length <= 12) brandability += 15;
@@ -209,6 +213,7 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
       "brandability",
       "品牌力",
       brandability,
+      true,
       input.language.pronounceable
         ? `主体 ${input.name.length} 字符；具备较好的发音线索`
         : `主体 ${input.name.length} 字符；需进一步验证语言与发音`,
@@ -217,6 +222,7 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
       "memorability",
       "记忆度",
       memorability,
+      true,
       input.name.length <= 12 && input.hyphens === 0 && input.language.pronounceable
         ? "长度、输入与发音结构较友好"
         : "输入或发音结构存在一定记忆成本",
@@ -225,25 +231,31 @@ function buildDimensions(input: DimensionInput): Record<ScoreDimensionKey, Score
       "commercialPotential",
       "商业潜力",
       commercialPotential,
+      true,
       "基于结构与后缀通用性，暂未包含成交案例",
     ),
     extensionFit: dimension(
       "extensionFit",
       "后缀匹配",
       extensionFit,
+      true,
       `.${input.suffix} 的通用认知与品牌适配规则`,
     ),
     globalReach: dimension(
       "globalReach",
       "全球化能力",
       globalReach,
+      true,
       input.isIdn ? "国际化字符更依赖特定语言市场" : "ASCII 结构便于跨市场输入",
     ),
     marketSignals: dimension(
       "marketSignals",
       "活跃度信号",
       marketSignals,
-      "仅基于域龄与 DNS 活跃度，不代表市场需求或成交表现",
+      activityAvailable,
+      activityAvailable
+        ? "仅基于域龄与 DNS 活跃度，不代表市场需求或成交表现"
+        : "外部数据不完整，本项暂不参与总分",
     ),
   };
 }
@@ -252,9 +264,10 @@ function dimension(
   key: ScoreDimensionKey,
   label: string,
   score: number,
+  available: boolean,
   conclusion: string,
 ): ScoreDimension {
-  return { key, label, score: clamp(Math.round(score)), weight: weights[key], conclusion };
+  return { key, label, score: clamp(Math.round(score)), weight: weights[key], available, conclusion };
 }
 
 function extensionScore(suffix: string): number {
@@ -280,7 +293,8 @@ function calculateCoverage(rdap: RdapResult, dns: DnsResult): number {
   if (rdap.registrar) coverage += 15;
   if (rdap.createdAt) coverage += 20;
   if (rdap.expiresAt) coverage += 15;
-  if (dns.resolves) coverage += 15;
+  if (dns.checked) coverage += 5;
+  if (dns.resolves) coverage += 10;
   if (rdap.dnssec !== null) coverage += 10;
   if (rdap.nameServers.length || dns.nameServers.length) coverage += 5;
   return clamp(coverage);

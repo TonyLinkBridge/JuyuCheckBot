@@ -3,6 +3,7 @@ import { scoreDomain } from "../src/domain/score.js";
 import type { DnsResult, RdapResult } from "../src/domain/types.js";
 
 const healthyDns: DnsResult = {
+  checked: true,
   resolves: true,
   ipv4: ["93.184.216.34"],
   ipv6: [],
@@ -36,7 +37,7 @@ describe("scoreDomain", () => {
     });
     expect(result.score).toBeGreaterThanOrEqual(90);
     expect(result.grade).toBe("S");
-    expect(result.scoreVersion).toBe("JUYU-1.1");
+    expect(result.scoreVersion).toBe("JUYU-1.2");
     expect(result.confidence).toBe("medium");
     expect(Object.keys(result.dimensions)).toHaveLength(6);
     expect(result.dimensions.extensionFit.score).toBe(100);
@@ -77,12 +78,43 @@ describe("scoreDomain", () => {
         expiresAt: new Date("2026-08-20T00:00:00Z"),
         dnssec: false,
       }),
-      dns: { resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] },
+      dns: { checked: true, resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] },
       now: new Date("2026-08-14T00:00:00Z"),
     });
     expect(result.riskLevel).toBe("high");
     expect(result.riskFlags.join(" ")).toContain("不足 30 天");
     expect(result.score).toBeLessThan(50);
     expect(result.grade).toBe("D");
+  });
+
+  it("does not punish the total score when external activity data is unavailable", () => {
+    const complete = scoreDomain({
+      domain: "crypto.com",
+      registrableDomain: "crypto.com",
+      isIdn: false,
+      rdap: rdap(),
+      dns: healthyDns,
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+    const incomplete = scoreDomain({
+      domain: "crypto.com",
+      registrableDomain: "crypto.com",
+      isIdn: false,
+      rdap: rdap({
+        status: "unknown",
+        registrar: null,
+        createdAt: null,
+        expiresAt: null,
+        dnssec: null,
+      }),
+      dns: { checked: false, resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] },
+      now: new Date("2026-08-14T00:00:00Z"),
+    });
+
+    expect(incomplete.score).toBeGreaterThanOrEqual(complete.score - 2);
+    expect(incomplete.confidence).toBe("low");
+    expect(incomplete.riskLevel).toBe("unknown");
+    expect(incomplete.dimensions.marketSignals.available).toBe(false);
+    expect(incomplete.dimensions.marketSignals.conclusion).toContain("不参与总分");
   });
 });

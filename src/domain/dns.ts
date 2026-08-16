@@ -16,15 +16,23 @@ export async function checkDns(domain: string, timeoutMs: number): Promise<DnsRe
     }
   };
 
-  const [ipv4, ipv6, nameServers, mx] = await Promise.all([
+  const lookups = await Promise.all([
     safely(withTimeout(dns.resolve4(domain))),
     safely(withTimeout(dns.resolve6(domain))),
     safely(withTimeout(dns.resolveNs(domain))),
     safely(withTimeout(dns.resolveMx(domain))),
   ]);
+  const [ipv4Lookup, ipv6Lookup, nameServerLookup, mxLookup] = lookups;
+  const ipv4 = ipv4Lookup.values;
+  const ipv6 = ipv6Lookup.values;
+  const nameServers = nameServerLookup.values;
+  const mx = mxLookup.values;
+  const resolves = ipv4.length > 0 || ipv6.length > 0 || nameServers.length > 0 || mx.length > 0;
+  const checked = resolves || lookups.filter((lookup) => lookup.definitive).length >= 3;
 
   return {
-    resolves: ipv4.length > 0 || ipv6.length > 0 || nameServers.length > 0 || mx.length > 0,
+    checked,
+    resolves,
     ipv4,
     ipv6,
     nameServers: nameServers.map((name) => name.toLowerCase().replace(/\.$/, "")),
@@ -32,10 +40,32 @@ export async function checkDns(domain: string, timeoutMs: number): Promise<DnsRe
   };
 }
 
-async function safely<T>(promise: Promise<T[]>): Promise<T[]> {
-  try {
-    return await promise;
-  } catch {
-    return [];
+export async function checkDnsWithRetry(domain: string, timeoutMs: number, attempts = 2): Promise<DnsResult> {
+  const attemptTimeout = Math.max(1000, Math.floor(timeoutMs / Math.max(1, attempts)));
+  let last: DnsResult | null = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    last = await checkDns(domain, attemptTimeout);
+    if (last.checked) return last;
   }
+  return last ?? emptyDnsResult();
+}
+
+type LookupResult<T> = { values: T[]; definitive: boolean };
+
+async function safely<T>(promise: Promise<T[]>): Promise<LookupResult<T>> {
+  try {
+    return { values: await promise, definitive: true };
+  } catch (error) {
+    return { values: [], definitive: isDefinitiveDnsAnswer(error) };
+  }
+}
+
+function isDefinitiveDnsAnswer(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const code = String(error.code);
+  return code === "ENODATA" || code === "ENOTFOUND" || code === "ENONAME" || code === "NOTFOUND" || code === "NODATA";
+}
+
+export function emptyDnsResult(): DnsResult {
+  return { checked: false, resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] };
 }

@@ -41,6 +41,19 @@ export async function checkRdap(domain: string, timeoutMs: number): Promise<Rdap
   };
 }
 
+export async function checkRdapWithRetry(domain: string, timeoutMs: number, attempts = 2): Promise<RdapResult> {
+  const attemptTimeout = Math.max(1000, Math.floor(timeoutMs / Math.max(1, attempts)));
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await checkRdap(domain, attemptTimeout);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("RDAP lookup failed");
+}
+
 function emptyResult(status: "available" | "unknown"): RdapResult {
   return {
     status,

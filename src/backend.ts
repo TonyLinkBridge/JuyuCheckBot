@@ -50,6 +50,7 @@ export interface Backend {
   saveReport(record: StoredReport): Promise<boolean>;
   getReport(reportToken: string, telegramUserId: number): Promise<StoredReport | null>;
   getReferralReport(reportToken: string): Promise<StoredReport | null>;
+  hasReferralOpen(telegramUserId: number): Promise<boolean>;
   getRecentReport(domain: string, scoreVersion: string, maxAgeMs: number): Promise<DomainReport | null>;
   listReports(telegramUserId: number, limit: number): Promise<StoredReport[]>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
@@ -82,6 +83,10 @@ class MemoryBackend implements Backend {
 
   async getReferralReport(): Promise<StoredReport | null> {
     return null;
+  }
+
+  async hasReferralOpen(): Promise<boolean> {
+    return false;
   }
 
   async getRecentReport(): Promise<DomainReport | null> {
@@ -234,6 +239,17 @@ class SupabaseBackend implements Backend {
     return this.getStoredReport(`domain_reports?${query}`);
   }
 
+  async hasReferralOpen(telegramUserId: number): Promise<boolean> {
+    const query = new URLSearchParams({
+      telegram_user_id: `eq.${telegramUserId}`,
+      event_name: "eq.referral_opened",
+      select: "event_name",
+      limit: "1",
+    });
+    const rows = await this.readRows(`growth_events?${query}`);
+    return Boolean(rows?.length);
+  }
+
   async getRecentReport(domain: string, scoreVersion: string, maxAgeMs: number): Promise<DomainReport | null> {
     const query = new URLSearchParams({
       domain: `eq.${domain}`,
@@ -254,10 +270,15 @@ class SupabaseBackend implements Backend {
       telegram_user_id: `eq.${telegramUserId}`,
       select: "report_token,telegram_user_id,source,report,intent",
       order: "created_at.desc",
-      limit: String(Math.max(1, Math.min(10, limit))),
+      limit: String(Math.max(5, Math.min(50, limit * 5))),
     });
     const rows = await this.readRows(`domain_reports?${query}`);
-    return (rows ?? []).map(parseStoredReport).filter((row): row is StoredReport => row !== null);
+    const unique = new Map<string, StoredReport>();
+    for (const stored of (rows ?? []).map(parseStoredReport).filter((row): row is StoredReport => row !== null)) {
+      if (!unique.has(stored.report.domain)) unique.set(stored.report.domain, stored);
+      if (unique.size >= Math.max(1, Math.min(10, limit))) break;
+    }
+    return [...unique.values()];
   }
 
   async deleteUserData(telegramUserId: number): Promise<boolean> {

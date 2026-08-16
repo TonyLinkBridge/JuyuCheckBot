@@ -12,6 +12,7 @@ export type RdapResult = {
 };
 
 export type DnsResult = {
+  checked: boolean;
   resolves: boolean;
   ipv4: string[];
   ipv6: string[];
@@ -37,6 +38,7 @@ export type ScoreDimension = {
   label: string;
   score: number;
   weight: number;
+  available: boolean;
   conclusion: string;
 };
 

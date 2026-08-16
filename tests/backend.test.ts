@@ -60,4 +60,56 @@ describe("Supabase report persistence", () => {
 
     await expect(backend.getReport("missing", 123)).resolves.toBeNull();
   });
+
+  it("detects whether a user already has a referral-open event", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([{ event_name: "referral_opened" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    await expect(backend.hasReferralOpen(123)).resolves.toBe(true);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("event_name=eq.referral_opened");
+  });
+
+  it("deduplicates recent reports by domain", async () => {
+    const report = (domain: string, checkedAt: string) => ({
+      domain,
+      checkedAt,
+      rdap: { createdAt: null, expiresAt: null, updatedAt: null },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify([
+            { report_token: "new-a", telegram_user_id: 123, source: "direct", report: report("a.com", "2026-08-16T03:00:00Z") },
+            { report_token: "old-a", telegram_user_id: 123, source: "direct", report: report("a.com", "2026-08-16T02:00:00Z") },
+            { report_token: "new-b", telegram_user_id: 123, source: "direct", report: report("b.com", "2026-08-16T01:00:00Z") },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    const reports = await backend.listReports(123, 5);
+
+    expect(reports.map((item) => item.reportToken)).toEqual(["new-a", "new-b"]);
+  });
 });

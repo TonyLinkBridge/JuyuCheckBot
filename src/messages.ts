@@ -98,7 +98,10 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
   const dnssec = report.rdap.dnssec === null ? "未知" : report.rdap.dnssec ? "已启用" : "未启用";
   const nsCount = new Set([...report.rdap.nameServers, ...report.dns.nameServers]).size;
   const dimensionLines = Object.values(report.dimensions)
-    .map((item) => `• ${item.label}：<b>${item.score}</b>｜${escapeHtml(item.conclusion)}`)
+    .map(
+      (item) =>
+        `• ${item.label}：<b>${item.available === false ? "N/A" : item.score}</b>｜${escapeHtml(item.conclusion)}`,
+    )
     .join("\n");
   const strengths = report.strengths.length
     ? report.strengths.slice(0, 3).map((item, index) => `${padIndex(index)} ${escapeHtml(item)}`).join("\n")
@@ -118,7 +121,7 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
 • 注册日期：${formatDate(report.rdap.createdAt)}
 • 域名年龄：${age}
 • 到期日期：${formatDate(report.rdap.expiresAt)}
-• DNS 解析：${report.dns.resolves ? "正常" : "未发现有效解析"}
+• DNS 解析：${report.dns.checked === false ? "数据暂不可用" : report.dns.resolves ? "正常" : "未发现有效解析"}
 • Nameserver：${nsCount || "未发现"}
 • MX：${report.dns.mx.length ? `${report.dns.mx.length} 条` : "未发现"}
 • DNSSEC：${dnssec}
