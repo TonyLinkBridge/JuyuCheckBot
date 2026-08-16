@@ -84,10 +84,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .brand-mark-large { width: 38px; height: 38px; font-size: 18px; border-radius: 9px; }
 .sidebar nav { margin-top: 27px; display: grid; gap: 3px; }
 .sidebar nav p { margin: 0 9px 8px; color: var(--text-faint); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.sidebar nav a { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 7px; color: var(--text-soft); text-decoration: none; font-size: 13px; transition: .15s ease; }
+.sidebar nav a { position: relative; display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 7px; color: var(--text-soft); text-decoration: none; font-size: 13px; transition: .15s ease; }
 .sidebar nav a:hover { color: var(--text-strong); background: var(--surface-hover); }
 .sidebar nav a.active { color: var(--text-strong); background: var(--surface-active); box-shadow: 0 0 0 1px rgba(255,255,255,.035) inset; }
 .sidebar nav a.active svg { color: var(--green); }
+.sidebar nav a.active::before { content: ""; position: absolute; left: -4px; width: 2px; height: 16px; border-radius: 999px; background: var(--green); box-shadow: 0 0 10px var(--green-dim); }
 .sidebar-status { margin-top: auto; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .status-row { display: flex; align-items: center; gap: 7px; color: var(--text-medium); font-size: 12px; }
 .status-row .inline-flex { margin-left: auto; padding: 2px 6px; color: var(--green); border-color: rgba(88,208,166,.18); background: var(--green-dim); font-size: 9px; }
@@ -236,10 +237,17 @@ tbody tr:hover td { background: var(--row-hover); }
 
 @media (max-width: 860px) {
   .dashboard-shell { display: block; }
-  .sidebar { position: relative; width: 100%; height: auto; flex-direction: row; align-items: center; padding: 11px 15px; border-right: 0; border-bottom: 1px solid var(--border); }
-  .sidebar-brand { padding: 0; }.sidebar nav { display: none; }.sidebar-status { display: none; }.sidebar form { margin-left: auto; }.signout-button { width: auto; }
-  .topbar { top: 59px; height: auto; min-height: 70px; padding: 12px 18px; }
+  .sidebar { position: sticky; top: 0; width: 100%; height: auto; flex-flow: row wrap; align-items: center; padding: 11px 15px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .sidebar-brand { padding: 0; }
+  .sidebar nav { order: 2; width: calc(100% + 30px); display: flex; gap: 4px; overflow-x: auto; margin: 9px -15px -11px; padding: 7px 15px; border-top: 1px solid var(--border); scrollbar-width: none; }
+  .sidebar nav::-webkit-scrollbar { display: none; }
+  .sidebar nav p { display: none; }
+  .sidebar nav a { flex: none; min-height: 34px; padding: 0 11px; font-size: 11px; }
+  .sidebar nav a.active::before { inset: auto 10px -7px; width: auto; height: 2px; }
+  .sidebar-status { display: none; }.sidebar form { order: 1; margin-left: auto; }.signout-button { width: auto; }
+  .topbar { position: relative; top: auto; height: auto; min-height: 70px; padding: 12px 18px; }
   .topbar-subtitle { display: none; }.dashboard-content { padding: 26px 18px 64px; }
+  .section-block { scroll-margin-top: 112px; }
   .analytics-grid { grid-template-columns: 1fr; }.trend-card, .gate-card { min-height: 350px; }
 }
 

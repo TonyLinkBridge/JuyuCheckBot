@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  Activity,
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
@@ -8,25 +7,21 @@ import {
   Bot,
   CheckCircle2,
   ChevronRight,
-  CircleGauge,
   Clock3,
   Database,
   ExternalLink,
   Fingerprint,
   Gauge,
   GitFork,
-  LayoutDashboard,
   LogOut,
   Radio,
   RefreshCw,
-  Send,
   Share2,
   ShieldCheck,
   Sparkles,
   Target,
   TrendingUp,
   Users,
-  Workflow,
   Wrench,
   XCircle,
 } from "lucide-react";
@@ -34,6 +29,7 @@ import { logout } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { GrowthAreaChart } from "@/components/tremor/growth-area-chart";
+import { SectionNav } from "@/components/section-nav";
 import { SourceBarChart } from "@/components/tremor/source-bar-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { rangeOptions, type DashboardData, type Metric } from "@/lib/dashboard-data";
@@ -191,27 +187,13 @@ export function Dashboard({ data }: { data: DashboardData }) {
 }
 
 function Sidebar() {
-  const links = [
-    { href: "#overview", label: "总览 Overview", icon: LayoutDashboard },
-    { href: "#funnel", label: "漏斗 Funnel", icon: Workflow },
-    { href: "#sources", label: "获客 Acquisition", icon: Send },
-    { href: "#intelligence", label: "质量 Intelligence", icon: CircleGauge },
-    { href: "#activity", label: "活动 Activity", icon: Activity },
-  ];
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="brand-mark">J</div>
         <div><strong>JUYU</strong><span>Growth Intelligence</span></div>
       </div>
-      <nav aria-label="Dashboard sections">
-        <p>Workspace</p>
-        {links.map(({ href, label, icon: Icon }, index) => (
-          <a href={href} key={href} className={cn(index === 0 && "active")}>
-            <Icon size={16} aria-hidden="true" /> {label}
-          </a>
-        ))}
-      </nav>
+      <SectionNav />
       <div className="sidebar-status">
         <div className="status-row"><span className="status-pulse" /><span>Bot 在线</span><Badge>LIVE</Badge></div>
         <p>@JuyuCheckBot</p>
