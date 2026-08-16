@@ -160,17 +160,13 @@ export function fullReportKeyboard(
   if (intent === "owner") {
     keyboard
       .row()
-      .url("💰 提交 JUYU 出售 / 深度评估", commerceLink(config.COMMERCE_BOT_USERNAME, "sell", report.domain));
+      .text("💰 提交 JUYU 出售 / 深度评估", `lead:owner:${token}`);
   } else if (intent === "buyer") {
     keyboard
       .row()
-      .url(
+      .text(
         report.rdap.status === "available" ? "🎯 委托 JUYU 协助注册" : "🤝 委托 JUYU 协助收购",
-        commerceLink(
-          config.COMMERCE_BOT_USERNAME,
-          report.rdap.status === "available" ? "register" : "buy",
-          report.domain,
-        ),
+        `lead:buyer:${token}`,
       );
   } else {
     keyboard.row().url("🌐 查看 JUYU 官方服务", "https://www.juyu.com/");
@@ -299,7 +295,7 @@ function referralLink(botUsername: string, token: string): string {
   return `https://t.me/${botUsername}?start=${encodeURIComponent(`ref_${token}`)}`;
 }
 
-function commerceLink(botUsername: string, action: string, domain: string): string {
+export function commerceLink(botUsername: string, action: string, domain: string): string {
   const payload = `${action}_${encodeDomainParam(domain)}`;
   return payload.length <= 64
     ? `https://t.me/${botUsername}?start=${encodeURIComponent(payload)}`

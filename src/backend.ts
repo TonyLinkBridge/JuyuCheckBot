@@ -15,6 +15,7 @@ export type GrowthEventName =
   | "report_unlocked"
   | "share_generated"
   | "referral_opened"
+  | "commerce_handoff"
   | "history_viewed";
 
 export type GrowthEvent = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, CircleGauge, GitFork, LayoutDashboard, Send, Workflow } from "lucide-react";
+import { Activity, Briefcase, CircleGauge, GitFork, LayoutDashboard, Send, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ const sections = [
   { id: "overview", label: "总览 Overview", icon: LayoutDashboard },
   { id: "funnel", label: "漏斗 Funnel", icon: Workflow },
   { id: "referrals", label: "推荐 Referral", icon: GitFork },
+  { id: "leads", label: "客户 Leads", icon: Briefcase },
   { id: "sources", label: "获客 Acquisition", icon: Send },
   { id: "intelligence", label: "质量 Intelligence", icon: CircleGauge },
   { id: "activity", label: "活动 Activity", icon: Activity },

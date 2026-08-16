@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Bot,
+  Briefcase,
   CheckCircle2,
   ChevronRight,
   Clock3,
@@ -54,6 +55,7 @@ const eventLabels: Record<string, string> = {
   report_unlocked: "解锁完整报告",
   share_generated: "生成分享卡",
   referral_opened: "打开推荐链接",
+  commerce_handoff: "进入聚域助手",
   check_failed: "域名体检失败",
   rate_limited: "触发频率限制",
   history_viewed: "查看历史报告",
@@ -147,6 +149,15 @@ export function Dashboard({ data }: { data: DashboardData }) {
               description="追踪分享是否真正带来新用户、域名提交与完整报告解锁。"
             />
             <ReferralLoop referral={data.referral} />
+          </section>
+
+          <section id="leads" className="section-block">
+            <SectionHeading
+              eyebrow="LEAD CONVERSION"
+              title="潜在客户"
+              description="识别想购买、出售或注册域名的用户，并追踪 JUYU 商业服务导流。"
+            />
+            <LeadConversion leads={data.leads} />
           </section>
 
           <section id="sources" className="section-block">
@@ -388,6 +399,49 @@ function ReferralLoop({ referral }: { referral: DashboardData["referral"] }) {
   );
 }
 
+function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
+  const metrics = [
+    { label: "商业意向用户", value: String(leads.commercialIntentUsers), hint: "Owner + Buyer" },
+    { label: "想购买", value: String(leads.buyerUsers), hint: "Buyer intent" },
+    { label: "想出售", value: String(leads.ownerUsers), hint: "Owner intent" },
+    { label: "助手导流率", value: formatPercent(leads.handoffRate), hint: `${leads.handoffUsers} users handed off` },
+  ];
+  return (
+    <>
+      <div className="lead-metrics">
+        {metrics.map((metric) => <Card key={metric.label} className="lead-metric-card"><CardContent><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.hint}</small></CardContent></Card>)}
+      </div>
+      <div className="lead-grid">
+        <Card className="lead-opportunities-card">
+          <CardHeader><div><p className="card-kicker">OPPORTUNITIES</p><h2>潜在客户列表 <small>Lead opportunities</small></h2></div><Briefcase size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
+          <CardContent className="table-wrap">
+            <table>
+              <thead><tr><th>优先级</th><th>域名</th><th>意图</th><th>操作</th><th>评分</th><th>来源</th><th>状态</th></tr></thead>
+              <tbody>{leads.opportunities.length ? leads.opportunities.map((lead, index) => <tr key={`${lead.domain}-${lead.intent}-${index}`}>
+                <td><Badge className={`priority-${lead.priority}`}>{priorityLabel(lead.priority)}</Badge></td>
+                <td><span className="source-name">{lead.domain}</span></td>
+                <td>{lead.intent === "buyer" ? "想购买" : "想出售"}</td>
+                <td>{leadActionLabel(lead.action)}</td>
+                <td>{lead.score === null ? "—" : `${lead.score}${lead.grade ? ` · ${lead.grade}` : ""}`}</td>
+                <td><Badge>{lead.source}</Badge></td>
+                <td><span className={cn("lead-status", lead.handedOff && "handed-off")}><i />{lead.handedOff ? "已进入助手" : "待行动"}</span></td>
+              </tr>) : <tr><td colSpan={7} className="empty-cell">用户选择购买或出售意图后显示</td></tr>}</tbody>
+            </table>
+          </CardContent>
+        </Card>
+        <Card className="lead-sources-card">
+          <CardHeader><div><p className="card-kicker">LEAD SOURCES</p><h2>客户来源 <small>Commercial attribution</small></h2></div><Fingerprint size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
+          <CardContent className="table-wrap">
+            <table><thead><tr><th>来源</th><th>意向</th><th>导流</th><th>转化</th></tr></thead><tbody>
+              {leads.sources.length ? leads.sources.map((source) => <tr key={source.source}><td><span className="source-name">{source.source}</span></td><td>{source.intents}</td><td>{source.handoffs}</td><td>{formatPercent(source.handoffRate)}</td></tr>) : <tr><td colSpan={4} className="empty-cell">等待商业意向数据</td></tr>}
+            </tbody></table>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+
 function QualityGrid({ quality }: { quality: DashboardData["quality"] }) {
   const items = [
     { label: "体检报告", value: String(quality.reportCount), hint: `Reports · 平均分 ${quality.averageScore.toFixed(1)}`, icon: Bot, tone: "neutral" },
@@ -438,4 +492,6 @@ function formatMetric(metric: Metric): string {
 
 function formatPercent(value: number): string { return `${(value * 100).toFixed(value > 0 && value < 0.1 ? 1 : 0)}%`; }
 function ratio(numerator: number, denominator: number): number { return denominator > 0 ? numerator / denominator : 0; }
+function priorityLabel(priority: "high" | "medium" | "low"): string { return priority === "high" ? "高" : priority === "medium" ? "中" : "低"; }
+function leadActionLabel(action: "sell" | "buy" | "register"): string { return action === "sell" ? "出售评估" : action === "register" ? "协助注册" : "协助收购"; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Kuala_Lumpur", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }

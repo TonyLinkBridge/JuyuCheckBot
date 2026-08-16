@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.js";
 import type { DomainReport } from "../src/domain/types.js";
 import {
+  commerceLink,
+  fullReportKeyboard,
   referralWelcomeKeyboard,
   referralWelcomeText,
   shareCardKeyboard,
@@ -20,6 +22,7 @@ const report = {
     memorability: { score: 90 },
     commercialPotential: { score: 88 },
   },
+  rdap: { status: "registered" },
 } as DomainReport;
 
 describe("referral growth messages", () => {
@@ -42,5 +45,27 @@ describe("referral growth messages", () => {
     expect(text).toContain("朋友分享了一份 JUYU 域名体检");
     expect(text).toContain("现在体检你的域名");
     expect(keyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("start_check");
+  });
+});
+
+describe("commerce lead messages", () => {
+  const config = loadConfig({
+    BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+    BOT_USERNAME: "JuyuCheckBot",
+    COMMERCE_BOT_USERNAME: "JuyuDomainBot",
+  });
+
+  it("uses tracked callback buttons before handing owners and buyers to Commerce Bot", () => {
+    const ownerKeyboard = fullReportKeyboard(config, report, "owner", "token_123");
+    const buyerKeyboard = fullReportKeyboard(config, report, "buyer", "token_123");
+
+    expect(ownerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:owner:token_123");
+    expect(buyerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:buyer:token_123");
+  });
+
+  it("builds a Commerce Bot deep link with the action and encoded domain", () => {
+    expect(commerceLink("JuyuDomainBot", "buy", "example.com")).toBe(
+      "https://t.me/JuyuDomainBot?start=buy_example-com",
+    );
   });
 });

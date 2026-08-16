@@ -15,6 +15,7 @@ type GrowthEvent = {
   source: string;
   domain: string | null;
   report_token: string | null;
+  intent: "owner" | "buyer" | "research" | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
 };
@@ -76,6 +77,30 @@ export type DashboardData = {
       activated: number;
     }>;
   };
+  leads: {
+    commercialIntentUsers: number;
+    buyerUsers: number;
+    ownerUsers: number;
+    handoffUsers: number;
+    handoffRate: number;
+    opportunities: Array<{
+      domain: string;
+      intent: "owner" | "buyer";
+      action: "sell" | "buy" | "register";
+      score: number | null;
+      grade: string | null;
+      source: string;
+      handedOff: boolean;
+      priority: "high" | "medium" | "low";
+      createdAt: string;
+    }>;
+    sources: Array<{
+      source: string;
+      intents: number;
+      handoffs: number;
+      handoffRate: number;
+    }>;
+  };
   trend: Array<{
     label: string;
     newUsers: number;
@@ -126,7 +151,7 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
   try {
     const [events, reports] = await Promise.all([
       readAll<GrowthEvent>(url, key, "growth_events", {
-        select: "event_name,telegram_user_id,source,domain,report_token,metadata,created_at",
+        select: "event_name,telegram_user_id,source,domain,report_token,intent,metadata,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
         order: "created_at.asc",
       }),
@@ -242,6 +267,7 @@ function buildDashboard(
       recoveryRate: ratio(recovered, failedTokens.size),
     },
     referral: buildReferral(current),
+    leads: buildLeads(current),
     trend: buildTrend(current, currentStart, now, days),
     sources: buildSources(current),
     quality: {
@@ -376,6 +402,94 @@ function buildReferral(events: GrowthEvent[]): DashboardData["referral"] {
   };
 }
 
+function buildLeads(events: GrowthEvent[]): DashboardData["leads"] {
+  const intentEvents = events.filter(
+    (event) => event.event_name === "intent_selected" && (event.intent === "owner" || event.intent === "buyer"),
+  );
+  const handoffEvents = events.filter((event) => event.event_name === "commerce_handoff");
+  const intentUsers = new Set([...intentEvents, ...handoffEvents].map((event) => event.telegram_user_id));
+  const buyerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "buyer").map((event) => event.telegram_user_id));
+  const ownerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "owner").map((event) => event.telegram_user_id));
+  const handoffUsers = new Set(handoffEvents.map((event) => event.telegram_user_id));
+  const handoffByToken = new Map(
+    handoffEvents.filter((event) => event.report_token).map((event) => [event.report_token as string, event]),
+  );
+  const previewByToken = new Map(
+    events
+      .filter((event) => event.event_name === "preview_shown" && event.report_token)
+      .map((event) => [event.report_token as string, event]),
+  );
+  const opportunities = new Map<string, DashboardData["leads"]["opportunities"][number]>();
+
+  for (const event of intentEvents) {
+    if (!event.report_token || !event.domain || (event.intent !== "owner" && event.intent !== "buyer")) continue;
+    const handoff = handoffByToken.get(event.report_token);
+    const preview = previewByToken.get(event.report_token);
+    const score = numericMetadata(handoff ?? preview ?? event, "score");
+    const gradeValue = (handoff ?? preview ?? event).metadata?.grade;
+    const grade = typeof gradeValue === "string" ? gradeValue : null;
+    const action = leadAction(event.intent, handoff?.metadata?.action, handoff?.metadata?.registrationStatus);
+    opportunities.set(event.report_token, {
+      domain: event.domain,
+      intent: event.intent,
+      action,
+      score,
+      grade,
+      source: event.source,
+      handedOff: Boolean(handoff),
+      priority: leadPriority(event.intent, score, Boolean(handoff)),
+      createdAt: handoff?.created_at ?? event.created_at,
+    });
+  }
+
+  for (const event of handoffEvents) {
+    if (!event.report_token || opportunities.has(event.report_token) || !event.domain || (event.intent !== "owner" && event.intent !== "buyer")) continue;
+    const score = numericMetadata(event, "score");
+    const gradeValue = event.metadata?.grade;
+    opportunities.set(event.report_token, {
+      domain: event.domain,
+      intent: event.intent,
+      action: leadAction(event.intent, event.metadata?.action, event.metadata?.registrationStatus),
+      score,
+      grade: typeof gradeValue === "string" ? gradeValue : null,
+      source: event.source,
+      handedOff: true,
+      priority: leadPriority(event.intent, score, true),
+      createdAt: event.created_at,
+    });
+  }
+
+  const sourceMap = new Map<string, { intentUsers: Set<number>; handoffUsers: Set<number> }>();
+  for (const event of [...intentEvents, ...handoffEvents]) {
+    const item = sourceMap.get(event.source) ?? { intentUsers: new Set<number>(), handoffUsers: new Set<number>() };
+    if (event.event_name === "intent_selected") item.intentUsers.add(event.telegram_user_id);
+    if (event.event_name === "commerce_handoff") {
+      item.intentUsers.add(event.telegram_user_id);
+      item.handoffUsers.add(event.telegram_user_id);
+    }
+    sourceMap.set(event.source, item);
+  }
+
+  return {
+    commercialIntentUsers: intentUsers.size,
+    buyerUsers: buyerUsers.size,
+    ownerUsers: ownerUsers.size,
+    handoffUsers: handoffUsers.size,
+    handoffRate: ratio(handoffUsers.size, intentUsers.size),
+    opportunities: [...opportunities.values()]
+      .sort((left, right) => leadPriorityRank(right.priority) - leadPriorityRank(left.priority) || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 12),
+    sources: [...sourceMap.entries()]
+      .map(([source, value]) => ({
+        source,
+        intents: value.intentUsers.size,
+        handoffs: value.handoffUsers.size,
+        handoffRate: ratio(value.handoffUsers.size, value.intentUsers.size),
+      }))
+      .sort((left, right) => right.handoffs - left.handoffs || right.intents - left.intents),
+  };
+}
+
 function buildTrend(events: GrowthEvent[], start: Date, end: Date, days: number): DashboardData["trend"] {
   const bucketCount = days === 1 ? 12 : Math.min(days, 30);
   const interval = Math.max(1, (end.getTime() - start.getTime()) / bucketCount);
@@ -424,6 +538,29 @@ function intersectionSize(left: Set<number>, right: Set<number>): number {
 
 function intersectionSet(left: Set<number>, right: Set<number>): Set<number> {
   return new Set([...left].filter((value) => right.has(value)));
+}
+
+function leadAction(
+  intent: "owner" | "buyer",
+  metadataAction: unknown,
+  registrationStatus: unknown,
+): "sell" | "buy" | "register" {
+  if (intent === "owner") return "sell";
+  if (metadataAction === "register" || registrationStatus === "available") return "register";
+  return "buy";
+}
+
+function leadPriority(intent: "owner" | "buyer", score: number | null, handedOff: boolean): "high" | "medium" | "low" {
+  const points = (handedOff ? 3 : 0) + (intent === "buyer" ? 2 : 1) + ((score ?? 0) >= 80 ? 2 : (score ?? 0) >= 65 ? 1 : 0);
+  if (points >= 5) return "high";
+  if (points >= 3) return "medium";
+  return "low";
+}
+
+function leadPriorityRank(priority: "high" | "medium" | "low"): number {
+  if (priority === "high") return 3;
+  if (priority === "medium") return 2;
+  return 1;
 }
 
 function metric(value: number, previous: number, format: Metric["format"], numerator?: number, denominator?: number): Metric {
@@ -489,6 +626,15 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       unlockRate: 0,
       kFactor: 0,
       topDomains: [],
+    },
+    leads: {
+      commercialIntentUsers: 0,
+      buyerUsers: 0,
+      ownerUsers: 0,
+      handoffUsers: 0,
+      handoffRate: 0,
+      opportunities: [],
+      sources: [],
     },
     trend: [],
     sources: [],

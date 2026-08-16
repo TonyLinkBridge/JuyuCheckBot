@@ -25,11 +25,12 @@
 - 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
 - `/recent` 最近报告、15 分钟域名结果缓存和安全分享推荐深链
 - Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
+- Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - `JUYU-1.2` 对 RDAP / DNS 临时失败执行重试；缺失的活跃度数据不参与总分，只降低置信度
 - 推荐打开按独立用户计数，最近报告按域名去重
-- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、来源质量、Growth Gate 与数据健康监控
+- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与数据健康监控
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
 ## 本地启动
@@ -90,7 +91,7 @@ Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但�
 - 数据：只在服务器端使用 Supabase Service Role，浏览器只接收聚合指标
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
 - 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
-- 分析：新用户 Cohort Funnel、Referral Funnel、Growth Gate 转化、来源质量、报告质量与最近活动
+- 分析：新用户 Cohort Funnel、Referral Funnel、Lead Conversion、Growth Gate 转化、来源质量、报告质量与最近活动
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 

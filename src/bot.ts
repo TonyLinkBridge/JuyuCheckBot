@@ -1,4 +1,4 @@
-import { Bot, Context, GrammyError, HttpError } from "grammy";
+import { Bot, Context, GrammyError, HttpError, InlineKeyboard } from "grammy";
 import { AttributionStore, sourceFromStartPayload } from "./attribution.js";
 import { createBackend, type StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
@@ -8,6 +8,7 @@ import { SCORE_VERSION } from "./domain/score.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 import {
   checkingText,
+  commerceLink,
   deleteDataConfirmKeyboard,
   deleteDataConfirmText,
   fullReportKeyboard,
@@ -231,6 +232,42 @@ export function createBot(config: Config): Bot {
         reply_markup: shareCardKeyboard(config, stored.report, token),
       }),
     ]);
+  });
+
+  bot.callbackQuery(/^lead:(owner|buyer):([A-Za-z0-9_-]+)$/, async (ctx) => {
+    const intent = ctx.match[1] as Extract<DomainIntent, "owner" | "buyer">;
+    const token = ctx.match[2];
+    if (!token) return;
+    const stored = await resolveReport(token, ctx.from.id);
+    if (!stored) {
+      await ctx.answerCallbackQuery({ text: "体检结果已过期，请重新发送域名。", show_alert: true });
+      return;
+    }
+    const action = intent === "owner" ? "sell" : stored.report.rdap.status === "available" ? "register" : "buy";
+    const handoffLink = commerceLink(config.COMMERCE_BOT_USERNAME, action, stored.report.domain);
+    await backend.track({
+      eventName: "commerce_handoff",
+      telegramUserId: ctx.from.id,
+      source: stored.source,
+      domain: stored.report.domain,
+      reportToken: token,
+      intent,
+      metadata: {
+        action,
+        score: stored.report.score,
+        grade: stored.report.grade,
+        registrationStatus: stored.report.rdap.status,
+      },
+    });
+
+    try {
+      await ctx.answerCallbackQuery({ text: "正在打开 JUYU 聚域助手…", url: handoffLink });
+    } catch {
+      await ctx.reply("商业委托入口已准备好，请点击下方按钮继续：", {
+        ...html,
+        reply_markup: new InlineKeyboard().url(leadActionLabel(action), handoffLink),
+      });
+    }
   });
 
   bot.callbackQuery(/^intent:(owner|buyer|research):([A-Za-z0-9_-]+)$/, async (ctx) => {
@@ -514,4 +551,10 @@ function intentLabel(intent: DomainIntent): string {
   if (intent === "owner") return "我拥有这个域名";
   if (intent === "buyer") return "我想购买这个域名";
   return "只是研究看看";
+}
+
+function leadActionLabel(action: string): string {
+  if (action === "sell") return "💰 进入出售 / 深度评估";
+  if (action === "register") return "🎯 进入协助注册";
+  return "🤝 进入协助收购";
 }

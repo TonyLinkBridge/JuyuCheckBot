@@ -210,6 +210,22 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .referral-stage b { color: var(--text-strong); font-family: var(--font-geist-mono); font-size: 15px; font-weight: 520; text-align: right; }
 .referral-domains-card .table-wrap { padding-top: 14px; }
 
+.lead-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.lead-metric-card .px-5 { padding: 15px; }
+.lead-metric-card span, .lead-metric-card small { display: block; overflow: hidden; color: var(--text-faint); white-space: nowrap; text-overflow: ellipsis; }
+.lead-metric-card span { font-size: 9px; font-weight: 550; letter-spacing: .03em; }
+.lead-metric-card strong { display: block; margin: 12px 0 8px; color: var(--text-strong); font-family: var(--font-geist-mono); font-size: 28px; font-weight: 520; letter-spacing: -.05em; }
+.lead-metric-card small { font-family: var(--font-geist-mono); font-size: 8px; }
+.lead-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(330px, .65fr); gap: 12px; }
+.lead-opportunities-card, .lead-sources-card { min-height: 360px; }
+.priority-high { color: var(--green); border-color: color-mix(in srgb, var(--green) 28%, transparent); background: var(--green-dim); }
+.priority-medium { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 28%, transparent); background: color-mix(in srgb, var(--amber) 10%, transparent); }
+.priority-low { color: var(--text-soft); }
+.lead-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); font-family: var(--font-geist-sans); font-size: 10px; }
+.lead-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 8%, transparent); }
+.lead-status.handed-off { color: var(--green); }
+.lead-status.handed-off i { background: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
+
 .source-grid { display: grid; grid-template-columns: minmax(300px, .75fr) minmax(520px, 1.25fr); gap: 12px; }
 .source-chart-content { height: 300px; }.source-chart { width: 100%; height: 100%; }
 .table-wrap { overflow-x: auto; padding-top: 14px; }
@@ -250,6 +266,8 @@ tbody tr:hover td { background: var(--row-hover); }
   .insight-grid { grid-template-columns: 1fr; }
   .referral-grid { grid-template-columns: 1fr; }
   .referral-domains-card { min-height: 300px; }
+  .lead-grid { grid-template-columns: 1fr; }
+  .lead-sources-card { min-height: 280px; }
   .source-grid { grid-template-columns: 1fr; }
   .source-grid > .rounded-xl { min-height: 330px; }
 }
@@ -280,6 +298,7 @@ tbody tr:hover td { background: var(--row-hover); }
   .metric-comparison > span:last-child { display: none; }.chart-legend { display: none; }
   .funnel-row { grid-template-columns: 30px minmax(115px, 1fr) 42px; gap: 9px; }.funnel-bar-track { grid-column: 2 / 4; width: 100%; margin: -5px 0 10px; }.funnel-value { grid-column: 3; grid-row: 1; }
   .referral-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lead-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .referral-stage { grid-template-columns: 24px minmax(120px, 1fr) 38px; }
   .referral-stage-rate { display: none; }
   .login-panel { padding: 25px; }
