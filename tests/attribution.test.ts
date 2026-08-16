@@ -16,7 +16,9 @@ describe("start attribution", () => {
   it("remembers and sanitizes a user's source", () => {
     const store = new AttributionStore();
     expect(store.set(42, "Campaign / August")).toBe("campaign___august");
+    expect(store.peek(42)).toBe("campaign___august");
     expect(store.get(42)).toBe("campaign___august");
+    expect(store.peek(99)).toBeNull();
     expect(store.get(99)).toBe("direct");
   });
 });

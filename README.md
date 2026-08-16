@@ -23,7 +23,8 @@
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
 - Supabase REST 后端持久保存并按用户安全读回报告，支持 Vercel 跨实例解锁
 - 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
-- `/recent` 最近报告、15 分钟域名结果缓存和分享推荐深链
+- `/recent` 最近报告、15 分钟域名结果缓存和安全分享推荐深链
+- Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - `JUYU-1.2` 对 RDAP / DNS 临时失败执行重试；缺失的活跃度数据不参与总分，只降低置信度
@@ -88,8 +89,8 @@ Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但�
 - 技术：Next.js、shadcn 风格组件、Tremor/Recharts 图表、Tailwind CSS、Geist
 - 数据：只在服务器端使用 Supabase Service Role，浏览器只接收聚合指标
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
-- 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate
-- 分析：新用户 Cohort Funnel、Growth Gate 转化、来源质量、报告质量与最近活动
+- 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
+- 分析：新用户 Cohort Funnel、Referral Funnel、Growth Gate 转化、来源质量、报告质量与最近活动
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 

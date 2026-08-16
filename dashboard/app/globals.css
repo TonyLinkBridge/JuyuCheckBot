@@ -193,6 +193,23 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .funnel-bar-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(88,208,166,.38), rgba(88,208,166,.85)); }
 .funnel-value { text-align: right; font-family: var(--font-geist-mono); font-size: 16px; font-weight: 500; }
 
+.referral-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, .75fr); gap: 12px; }
+.referral-funnel-card, .referral-domains-card { min-height: 420px; }
+.referral-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 16px 0 18px; }
+.referral-metrics > div { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.referral-metrics span, .referral-metrics small { display: block; overflow: hidden; color: var(--text-faint); font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
+.referral-metrics strong { display: block; margin: 7px 0 6px; color: var(--text-strong); font-family: var(--font-geist-mono); font-size: 22px; font-weight: 520; letter-spacing: -.04em; }
+.referral-flow { overflow: hidden; border: 1px solid var(--border); border-radius: 9px; }
+.referral-stage { min-height: 51px; display: grid; grid-template-columns: 32px minmax(150px, 1fr) 60px 38px; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+.referral-stage:last-child { border-bottom: 0; }
+.referral-stage-index { color: var(--text-faint); font-family: var(--font-geist-mono); font-size: 9px; }
+.referral-stage div strong, .referral-stage div small { display: block; }
+.referral-stage div strong { color: var(--text-medium); font-size: 11px; font-weight: 520; }
+.referral-stage div small { margin-top: 3px; color: var(--text-faint); font-family: var(--font-geist-mono); font-size: 8px; }
+.referral-stage-rate { color: var(--green); font-family: var(--font-geist-mono); font-size: 8px; text-align: right; }
+.referral-stage b { color: var(--text-strong); font-family: var(--font-geist-mono); font-size: 15px; font-weight: 520; text-align: right; }
+.referral-domains-card .table-wrap { padding-top: 14px; }
+
 .source-grid { display: grid; grid-template-columns: minmax(300px, .75fr) minmax(520px, 1.25fr); gap: 12px; }
 .source-chart-content { height: 300px; }.source-chart { width: 100%; height: 100%; }
 .table-wrap { overflow-x: auto; padding-top: 14px; }
@@ -231,6 +248,8 @@ tbody tr:hover td { background: var(--row-hover); }
 @media (max-width: 1200px) {
   .metric-grid, .quality-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .insight-grid { grid-template-columns: 1fr; }
+  .referral-grid { grid-template-columns: 1fr; }
+  .referral-domains-card { min-height: 300px; }
   .source-grid { grid-template-columns: 1fr; }
   .source-grid > .rounded-xl { min-height: 330px; }
 }
@@ -260,6 +279,9 @@ tbody tr:hover td { background: var(--row-hover); }
   .metric-grid, .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-comparison > span:last-child { display: none; }.chart-legend { display: none; }
   .funnel-row { grid-template-columns: 30px minmax(115px, 1fr) 42px; gap: 9px; }.funnel-bar-track { grid-column: 2 / 4; width: 100%; margin: -5px 0 10px; }.funnel-value { grid-column: 3; grid-row: 1; }
+  .referral-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .referral-stage { grid-template-columns: 24px minmax(120px, 1fr) 38px; }
+  .referral-stage-rate { display: none; }
   .login-panel { padding: 25px; }
 }
 

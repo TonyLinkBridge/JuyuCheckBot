@@ -181,6 +181,9 @@ export function fullReportKeyboard(
 
 export function shareCardText(report: DomainReport): string {
   const { brandability, memorability, commercialPotential } = report.dimensions;
+  const highlights = report.strengths.length
+    ? report.strengths.slice(0, 3).map((item) => `✓ ${escapeHtml(item)}`).join("\n")
+    : "✓ 已完成品牌、结构与基础风险扫描";
   return `📤 <b>JUYU DOMAIN CHECK</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
@@ -194,19 +197,50 @@ export function shareCardText(report: DomainReport): string {
 
 <b>${escapeHtml(report.verdict)}</b>
 
+${highlights}
+
+👇 <b>你也可以免费查一个域名</b>
+
 <i>免费域名体检 · Powered by JUYU 聚域</i>`;
 }
 
 export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
   const reportLink = referralLink(config.BOT_USERNAME, token);
-  const shareText = `我刚用 JUYU 给 ${report.domain} 做了域名体检：${report.score}/100，${report.grade}级。你也来查查：`;
+  const shareText = `我刚用 JUYU 体检了 ${report.domain}：${report.score}/100（${report.grade}级）。\n\n你觉得这个域名能做成品牌吗？点开也能免费查你的域名 👇`;
   return new InlineKeyboard()
     .url(
-      "📤 转发给朋友",
+      "📤 分享这份体检",
       `https://t.me/share/url?url=${encodeURIComponent(reportLink)}&text=${encodeURIComponent(shareText)}`,
     )
     .row()
-    .url("🔍 打开免费体检", reportLink);
+    .text("🔎 继续体检", "check_another");
+}
+
+export function referralWelcomeText(report: DomainReport): string {
+  const { brandability, memorability, commercialPotential } = report.dimensions;
+  return `👋 <b>朋友分享了一份 JUYU 域名体检</b>
+
+🌐 <b>${escapeHtml(report.domain)}</b>
+<b>${report.score} / 100　${report.grade}级</b>
+
+品牌力　　 ${brandability.score}
+记忆度　　 ${memorability.score}
+商业潜力　 ${commercialPotential.score}
+风险等级　 ${riskLabel(report.riskLevel)}
+
+<b>${escapeHtml(report.verdict)}</b>
+
+━━━━━━━━━━━━━━
+🔍 <b>现在体检你的域名</b>
+
+直接发送一个域名，例如：
+<code>yourdomain.com</code>
+
+先免费查看 JUYU Score、品牌潜力与基础风险。`;
+}
+
+export function referralWelcomeKeyboard(): InlineKeyboard {
+  return new InlineKeyboard().text("🔍 体检我的域名", "start_check");
 }
 
 export function recentReportsText(reports: StoredReport[]): string {

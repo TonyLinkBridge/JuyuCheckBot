@@ -23,6 +23,8 @@ import {
   rateLimitText,
   recentReportsKeyboard,
   recentReportsText,
+  referralWelcomeKeyboard,
+  referralWelcomeText,
   shareCardKeyboard,
   shareCardText,
   verificationUnavailableText,
@@ -53,7 +55,11 @@ export function createBot(config: Config): Bot {
     const userId = ctx.from?.id;
     if (!userId) return;
     const payload = ctx.match?.trim();
-    const source = attribution.set(userId, sourceFromStartPayload(payload));
+    const referralToken = payload?.startsWith("ref_") ? payload.slice("ref_".length) : null;
+    const sharedReferral = referralToken ? await backend.getReferralReport(referralToken) : null;
+    const isSelfReferral = sharedReferral?.telegramUserId === userId;
+    const requestedSource = referralToken && !sharedReferral ? "direct" : sourceFromStartPayload(payload);
+    const source = attribution.set(userId, isSelfReferral ? "direct" : requestedSource);
     const identity = await backend.identifyUser(userId, source);
     const startEvents = [
       backend.track({
@@ -71,30 +77,39 @@ export function createBot(config: Config): Bot {
       startEvents.push(backend.cleanupExpiredData(PRIVACY_RETENTION_DAYS));
     }
 
-    if (payload?.startsWith("ref_")) {
-      const referralToken = payload.slice("ref_".length);
-      const shared = referralToken ? await backend.getReferralReport(referralToken) : null;
-      if (shared) {
-        const alreadyRecorded = await backend.hasReferralOpen(userId);
-        const referralEvents = alreadyRecorded
-          ? []
-          : [
-              backend.track({
-                eventName: "referral_opened" as const,
-                telegramUserId: userId,
-                source,
-                domain: shared.report.domain,
-                reportToken: referralToken,
-                metadata: { referrerUserId: shared.telegramUserId, isNew: identity.isNew },
-              }),
-            ];
+    if (referralToken && sharedReferral) {
+      if (isSelfReferral) {
         await Promise.all([
           ...startEvents,
-          ...referralEvents,
-          runCheck(ctx, shared.report.domain),
+          ctx.reply(`👀 <b>这是你生成的分享页面</b>\n\n${shareCardText(sharedReferral.report)}`, {
+            ...html,
+            reply_markup: shareCardKeyboard(config, sharedReferral.report, referralToken),
+          }),
         ]);
         return;
       }
+      const alreadyRecorded = await backend.hasReferralOpen(userId, referralToken);
+      const referralEvents = alreadyRecorded
+        ? []
+        : [
+            backend.track({
+              eventName: "referral_opened" as const,
+              telegramUserId: userId,
+              source,
+              domain: sharedReferral.report.domain,
+              reportToken: referralToken,
+              metadata: { isNew: identity.isNew },
+            }),
+          ];
+      await Promise.all([
+        ...startEvents,
+        ...referralEvents,
+        ctx.reply(referralWelcomeText(sharedReferral.report), {
+          ...html,
+          reply_markup: referralWelcomeKeyboard(),
+        }),
+      ]);
+      return;
     }
     if (payload?.startsWith("share_")) {
       const encoded = payload.slice("share_".length);
@@ -319,7 +334,7 @@ export function createBot(config: Config): Bot {
     const userId = ctx.from?.id;
     if (!userId) return;
     const checkStartedAt = Date.now();
-    const source = attribution.get(userId);
+    const source = await sourceForUser(userId);
     const rateLimit = await backend.checkRateLimit(userId);
     if (!rateLimit.allowed) {
       await Promise.all([
@@ -403,7 +418,7 @@ export function createBot(config: Config): Bot {
   async function showRecentReports(ctx: Context): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) return;
-    const source = attribution.get(userId);
+    const source = await sourceForUser(userId);
     const recent = await backend.listReports(userId, 5);
     await Promise.all([
       backend.track({ eventName: "history_viewed", telegramUserId: userId, source }),
@@ -460,11 +475,19 @@ export function createBot(config: Config): Bot {
       return {
         reportToken: token,
         telegramUserId: userId,
-        source: attribution.get(userId),
+        source: await sourceForUser(userId),
         report: cached,
       };
     }
     return backend.getReport(token, userId);
+  }
+
+  async function sourceForUser(userId: number): Promise<string> {
+    const cached = attribution.peek(userId);
+    if (cached) return cached;
+    const persisted = await backend.getUserSource(userId);
+    if (persisted) return attribution.set(userId, persisted);
+    return "direct";
   }
 
   console.log(`Backend mode: ${backend.enabled ? "Supabase" : "memory"}`);

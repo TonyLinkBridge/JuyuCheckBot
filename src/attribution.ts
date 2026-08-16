@@ -10,10 +10,14 @@ export class AttributionStore {
   }
 
   get(userId: number): string {
+    return this.peek(userId) ?? "direct";
+  }
+
+  peek(userId: number): string | null {
     const value = this.sources.get(userId);
     if (!value || value.expiresAt < Date.now()) {
       if (value) this.sources.delete(userId);
-      return "direct";
+      return null;
     }
     return value.source;
   }

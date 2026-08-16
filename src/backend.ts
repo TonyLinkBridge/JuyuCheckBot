@@ -47,11 +47,12 @@ export interface Backend {
   enabled: boolean;
   track(event: GrowthEvent): Promise<void>;
   identifyUser(telegramUserId: number, source: string): Promise<UserIdentity>;
+  getUserSource(telegramUserId: number): Promise<string | null>;
   checkRateLimit(telegramUserId: number): Promise<RateLimitResult>;
   saveReport(record: StoredReport): Promise<boolean>;
   getReport(reportToken: string, telegramUserId: number): Promise<StoredReport | null>;
   getReferralReport(reportToken: string): Promise<StoredReport | null>;
-  hasReferralOpen(telegramUserId: number): Promise<boolean>;
+  hasReferralOpen(telegramUserId: number, reportToken: string): Promise<boolean>;
   getRecentReport(domain: string, scoreVersion: string, maxAgeMs: number): Promise<DomainReport | null>;
   listReports(telegramUserId: number, limit: number): Promise<StoredReport[]>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
@@ -68,6 +69,10 @@ class MemoryBackend implements Backend {
     const isNew = !this.users.has(telegramUserId);
     this.users.add(telegramUserId);
     return { isNew };
+  }
+
+  async getUserSource(): Promise<string | null> {
+    return null;
   }
 
   async checkRateLimit(): Promise<RateLimitResult> {
@@ -160,6 +165,17 @@ class SupabaseBackend implements Backend {
     return { isNew: inserted };
   }
 
+  async getUserSource(telegramUserId: number): Promise<string | null> {
+    const query = new URLSearchParams({
+      telegram_user_id: `eq.${telegramUserId}`,
+      select: "last_source",
+      limit: "1",
+    });
+    const rows = await this.readRows(`user_profiles?${query}`);
+    const source = rows?.[0]?.last_source;
+    return typeof source === "string" && source ? source : null;
+  }
+
   async checkRateLimit(telegramUserId: number): Promise<RateLimitResult> {
     const now = Date.now();
     const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
@@ -240,10 +256,11 @@ class SupabaseBackend implements Backend {
     return this.getStoredReport(`domain_reports?${query}`);
   }
 
-  async hasReferralOpen(telegramUserId: number): Promise<boolean> {
+  async hasReferralOpen(telegramUserId: number, reportToken: string): Promise<boolean> {
     const query = new URLSearchParams({
       telegram_user_id: `eq.${telegramUserId}`,
       event_name: "eq.referral_opened",
+      report_token: `eq.${reportToken}`,
       select: "event_name",
       limit: "1",
     });

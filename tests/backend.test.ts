@@ -77,8 +77,30 @@ describe("Supabase report persistence", () => {
       }),
     );
 
-    await expect(backend.hasReferralOpen(123)).resolves.toBe(true);
+    await expect(backend.hasReferralOpen(123, "report_token")).resolves.toBe(true);
     expect(fetchMock.mock.calls[0]?.[0]).toContain("event_name=eq.referral_opened");
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("report_token=eq.report_token");
+  });
+
+  it("restores the persisted attribution source for a returning user", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([{ last_source: "referral" }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    await expect(backend.getUserSource(123)).resolves.toBe("referral");
   });
 
   it("deduplicates recent reports by domain", async () => {

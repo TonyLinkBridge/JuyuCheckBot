@@ -58,6 +58,24 @@ export type DashboardData = {
     conversionRate: number;
     recoveryRate: number;
   };
+  referral: {
+    sharingUsers: number;
+    sharedReports: number;
+    openedUsers: number;
+    newUsers: number;
+    activatedUsers: number;
+    unlockedUsers: number;
+    openRate: number;
+    activationRate: number;
+    unlockRate: number;
+    kFactor: number;
+    topDomains: Array<{
+      domain: string;
+      opened: number;
+      newUsers: number;
+      activated: number;
+    }>;
+  };
   trend: Array<{
     label: string;
     newUsers: number;
@@ -223,6 +241,7 @@ function buildDashboard(
       conversionRate: ratio(gateUnlocked, gateTokens.size),
       recoveryRate: ratio(recovered, failedTokens.size),
     },
+    referral: buildReferral(current),
     trend: buildTrend(current, currentStart, now, days),
     sources: buildSources(current),
     quality: {
@@ -306,6 +325,57 @@ function buildSources(events: GrowthEvent[]): DashboardData["sources"] {
     .sort((left, right) => right.newUsers - left.newUsers);
 }
 
+function buildReferral(events: GrowthEvent[]): DashboardData["referral"] {
+  const shareEvents = events.filter((event) => event.event_name === "share_generated");
+  const openEvents = events.filter((event) => event.event_name === "referral_opened");
+  const sharingUsers = new Set(shareEvents.map((event) => event.telegram_user_id));
+  const sharedReports = new Set(shareEvents.map((event) => event.report_token).filter((token): token is string => Boolean(token)));
+  const openedUsers = new Set(openEvents.map((event) => event.telegram_user_id));
+  const openedSharedReports = new Set(
+    openEvents
+      .map((event) => event.report_token)
+      .filter((token): token is string => typeof token === "string" && sharedReports.has(token)),
+  );
+  const newUsers = new Set(
+    openEvents.filter((event) => event.metadata?.isNew === true).map((event) => event.telegram_user_id),
+  );
+  const submitted = userSet(events, "domain_submitted");
+  const unlocked = userSet(events, "report_unlocked");
+  const activatedUsers = intersectionSet(newUsers, submitted);
+  const unlockedUsers = intersectionSet(activatedUsers, unlocked);
+  const domainVisitors = new Map<string, { opened: Set<number>; newUsers: Set<number> }>();
+
+  for (const event of openEvents) {
+    if (!event.domain) continue;
+    const visitors = domainVisitors.get(event.domain) ?? { opened: new Set<number>(), newUsers: new Set<number>() };
+    visitors.opened.add(event.telegram_user_id);
+    if (event.metadata?.isNew === true) visitors.newUsers.add(event.telegram_user_id);
+    domainVisitors.set(event.domain, visitors);
+  }
+
+  return {
+    sharingUsers: sharingUsers.size,
+    sharedReports: sharedReports.size,
+    openedUsers: openedUsers.size,
+    newUsers: newUsers.size,
+    activatedUsers: activatedUsers.size,
+    unlockedUsers: unlockedUsers.size,
+    openRate: ratio(openedSharedReports.size, sharedReports.size),
+    activationRate: ratio(activatedUsers.size, newUsers.size),
+    unlockRate: ratio(unlockedUsers.size, activatedUsers.size),
+    kFactor: ratio(newUsers.size, sharingUsers.size),
+    topDomains: [...domainVisitors.entries()]
+      .map(([domain, visitors]) => ({
+        domain,
+        opened: visitors.opened.size,
+        newUsers: visitors.newUsers.size,
+        activated: intersectionSize(visitors.newUsers, submitted),
+      }))
+      .sort((left, right) => right.opened - left.opened || right.newUsers - left.newUsers)
+      .slice(0, 5),
+  };
+}
+
 function buildTrend(events: GrowthEvent[], start: Date, end: Date, days: number): DashboardData["trend"] {
   const bucketCount = days === 1 ? 12 : Math.min(days, 30);
   const interval = Math.max(1, (end.getTime() - start.getTime()) / bucketCount);
@@ -350,6 +420,10 @@ function intersectionSize(left: Set<number>, right: Set<number>): number {
   let count = 0;
   for (const value of left) if (right.has(value)) count += 1;
   return count;
+}
+
+function intersectionSet(left: Set<number>, right: Set<number>): Set<number> {
+  return new Set([...left].filter((value) => right.has(value)));
 }
 
 function metric(value: number, previous: number, format: Metric["format"], numerator?: number, denominator?: number): Metric {
@@ -403,6 +477,19 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       (label, index) => ({ key: String(index), label, value: 0 }),
     ),
     gate: { shown: 0, failed: 0, unlocked: 0, conversionRate: 0, recoveryRate: 0 },
+    referral: {
+      sharingUsers: 0,
+      sharedReports: 0,
+      openedUsers: 0,
+      newUsers: 0,
+      activatedUsers: 0,
+      unlockedUsers: 0,
+      openRate: 0,
+      activationRate: 0,
+      unlockRate: 0,
+      kFactor: 0,
+      topDomains: [],
+    },
     trend: [],
     sources: [],
     quality: {

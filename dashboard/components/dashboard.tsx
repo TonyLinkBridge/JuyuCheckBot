@@ -140,6 +140,15 @@ export function Dashboard({ data }: { data: DashboardData }) {
             <FunnelCard data={data.funnel} />
           </section>
 
+          <section id="referrals" className="section-block">
+            <SectionHeading
+              eyebrow="REFERRAL GROWTH LOOP"
+              title="推荐增长闭环"
+              description="追踪分享是否真正带来新用户、域名提交与完整报告解锁。"
+            />
+            <ReferralLoop referral={data.referral} />
+          </section>
+
           <section id="sources" className="section-block">
             <SectionHeading
               eyebrow="ACQUISITION"
@@ -325,6 +334,57 @@ function SourceTable({ sources }: { sources: DashboardData["sources"] }) {
         </table>
       </CardContent>
     </Card>
+  );
+}
+
+function ReferralLoop({ referral }: { referral: DashboardData["referral"] }) {
+  const stages = [
+    { label: "分享用户", secondary: "Sharing User", value: referral.sharingUsers },
+    { label: "推荐打开", secondary: "Referral Opened", value: referral.openedUsers },
+    { label: "推荐新用户", secondary: "New User", value: referral.newUsers },
+    { label: "提交自己的域名", secondary: "Domain Submitted", value: referral.activatedUsers },
+    { label: "解锁完整报告", secondary: "Report Unlocked", value: referral.unlockedUsers },
+  ];
+  const metrics = [
+    { label: "分享报告", value: String(referral.sharedReports), hint: "Shared reports" },
+    { label: "链接打开率", value: formatPercent(referral.openRate), hint: "Opened reports / shared reports" },
+    { label: "推荐激活率", value: formatPercent(referral.activationRate), hint: "Submitted / referred new users" },
+    { label: "增长系数", value: referral.kFactor.toFixed(2), hint: "New users per sharing user" },
+  ];
+  return (
+    <div className="referral-grid">
+      <Card className="referral-funnel-card">
+        <CardHeader>
+          <div><p className="card-kicker">LOOP PERFORMANCE</p><h2>分享转化路径 <small>Referral funnel</small></h2></div>
+          <GitFork size={18} className="muted-icon" aria-hidden="true" />
+        </CardHeader>
+        <CardContent>
+          <div className="referral-metrics">
+            {metrics.map((metric) => <div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.hint}</small></div>)}
+          </div>
+          <div className="referral-flow">
+            {stages.map((stage, index) => {
+              const previous = index === 0 ? stage.value : stages[index - 1]?.value ?? 0;
+              return <div className="referral-stage" key={stage.secondary}>
+                <span className="referral-stage-index">{String(index + 1).padStart(2, "0")}</span>
+                <div><strong>{stage.label}</strong><small>{stage.secondary}</small></div>
+                <span className="referral-stage-rate">{index === 0 ? "ENTRY" : index === 1 ? `${ratio(stage.value, previous).toFixed(2)}×` : formatPercent(ratio(stage.value, previous))}</span>
+                <b>{stage.value}</b>
+              </div>;
+            })}
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="referral-domains-card">
+        <CardHeader><div><p className="card-kicker">SHARED DOMAINS</p><h2>推荐表现最佳域名 <small>Top referrals</small></h2></div><Share2 size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
+        <CardContent className="table-wrap">
+          <table>
+            <thead><tr><th>域名</th><th>打开</th><th>新用户</th><th>激活</th></tr></thead>
+            <tbody>{referral.topDomains.length ? referral.topDomains.map((domain) => <tr key={domain.domain}><td><span className="source-name">{domain.domain}</span></td><td>{domain.opened}</td><td>{domain.newUsers}</td><td>{domain.activated}</td></tr>) : <tr><td colSpan={4} className="empty-cell">分享链接带来访问后显示</td></tr>}</tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
