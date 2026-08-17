@@ -232,22 +232,25 @@ export function shareCardText(report: DomainReport): string {
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-注册资料　${registrationStatusLine(report.rdap.status)}
-DNS　　　${dnsStatusLine(report)}
-资料取得　<b>${evidenceCount(report)}</b>
-基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
-来源　　　${registrationSource(report)}
+💡 <b>${escapeHtml(decisionConclusion(report, "research"))}</b>
 
-<b>${escapeHtml(report.summary)}</b>
+━━━━━━━━━━━━━━
+✅ <b>可验证信号</b>
+${shareSignalLines(report)}
 
+资料覆盖　基础 ${evidenceCount(report)} · 第三方 ${externalEvidenceCount(report)}
+值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
+
+━━━━━━━━━━━━━━
 👇 <b>你也可以免费查一个域名</b>
 
-<i>免费域名体检 · Powered by JUYU 聚域</i>`;
+<i>数据注明来源 · 不做自创评分
+免费域名体检 · Powered by JUYU 聚域</i>`;
 }
 
 export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
   const reportLink = referralLink(config.BOT_USERNAME, token);
-  const shareText = `我刚用 JUYU 查了 ${report.domain} 的注册资料、DNS 与基础警报。\n\n资料来源和缺失项目都会明确显示，你也可以免费查一个域名 👇`;
+  const shareText = `我刚用 JUYU 查了 ${report.domain}：\n\n${decisionConclusion(report, "research")}\n\n资料来源和缺失项目都会明确显示，不使用自创评分。你也可以免费查一个域名 👇`;
   return new InlineKeyboard()
     .url(
       "📤 分享这份体检",
@@ -261,12 +264,14 @@ export function referralWelcomeText(report: DomainReport): string {
   return `👋 <b>朋友分享了一份 JUYU 域名体检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-注册资料　${registrationStatusLine(report.rdap.status)}
-DNS　　　${dnsStatusLine(report)}
-资料取得　<b>${evidenceCount(report)}</b>
-基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
 
-<b>${escapeHtml(report.summary)}</b>
+💡 <b>${escapeHtml(decisionConclusion(report, "research"))}</b>
+
+✅ <b>可验证信号</b>
+${shareSignalLines(report)}
+
+资料覆盖　基础 ${evidenceCount(report)} · 第三方 ${externalEvidenceCount(report)}
+值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
 
 ━━━━━━━━━━━━━━
 🔍 <b>现在体检你的域名</b>
@@ -274,7 +279,7 @@ DNS　　　${dnsStatusLine(report)}
 直接发送一个域名，例如：
 <code>yourdomain.com</code>
 
-先免费查看注册资料、DNS、资料来源与基础警报。`;
+先免费查看结论和可信信号，订阅后解锁针对买家、持有人或研究目的的 JUYU 建议。`;
 }
 
 export function referralWelcomeKeyboard(): InlineKeyboard {
@@ -453,6 +458,45 @@ function hasActiveWebsiteSignals(report: DomainReport): boolean {
     report.intelligence.crux.status === "available" ||
     (report.intelligence.ahrefs.status === "available" && (report.intelligence.ahrefs.domainRating ?? 0) >= 20)
   );
+}
+
+function shareSignalLines(report: DomainReport): string {
+  const items: string[] = [];
+  if (report.rdap.status === "registered") {
+    items.push(report.ageYears === null ? "注册状态：已注册" : `注册历史：${formatYears(report.ageYears)} 年`);
+  } else if (report.rdap.status === "available") {
+    items.push("注册资料：权威资料源暂未发现记录");
+  } else {
+    items.push("注册资料：当前仍需复核");
+  }
+  if (report.dns.checked) items.push(`DNS：${report.dns.resolves ? "正常解析" : "未发现有效解析"}`);
+
+  const tranco = report.intelligence.tranco;
+  if (tranco.status === "available" && tranco.rank !== null) {
+    items.push(`Tranco 全球排名：#${formatInteger(tranco.rank)}`);
+  }
+  const ahrefs = report.intelligence.ahrefs;
+  if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
+    items.push(`Domain Rating by Ahrefs：${formatDecimal(ahrefs.domainRating)} / 100`);
+  }
+  const crux = report.intelligence.crux;
+  if (crux.status === "available") {
+    const ratings = [
+      crux.lcpP75Ms === null ? null : `LCP ${metricRating(crux.lcpP75Ms, 2500, 4000)}`,
+      crux.inpP75Ms === null ? null : `INP ${metricRating(crux.inpP75Ms, 200, 500)}`,
+      crux.clsP75 === null ? null : `CLS ${metricRating(crux.clsP75, 0.1, 0.25)}`,
+    ].filter((value): value is string => value !== null);
+    if (ratings.length) items.push(`Google CrUX：${ratings.join(" · ")}`);
+  }
+  return items.slice(0, 5).map((item) => `• ${escapeHtml(item)}`).join("\n");
+}
+
+function shareAttentionCount(report: DomainReport): number {
+  return decisionAttention(report).filter((item) => !item.startsWith("本次可用资料未发现明确警报")).length;
+}
+
+function metricRating(value: number, good: number, poor: number): string {
+  return value <= good ? "良好" : value <= poor ? "需要改善" : "较差";
 }
 
 function registrationLabel(status: RegistrationStatus): string {

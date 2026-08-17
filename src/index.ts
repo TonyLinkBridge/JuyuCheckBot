@@ -23,7 +23,7 @@ app.get("/health", (_request, response) => {
   response.status(200).json({
     ok: true,
     service: "juyu-domain-check",
-    version: "0.11.0",
+    version: "0.12.0",
     reportVersion: REPORT_VERSION,
     externalData: {
       tranco: "enabled",

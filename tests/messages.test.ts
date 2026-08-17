@@ -98,10 +98,12 @@ describe("referral growth messages", () => {
     const keyboard = shareCardKeyboard(config, report, "token_123");
     const shareUrl = keyboard.inline_keyboard[0]?.[0]?.url;
 
-    expect(text).toContain("资料取得");
-    expect(text).toContain("7/7 项");
-    expect(text).toContain("权威 RDAP");
-    expect(text).not.toContain("/ 100");
+    expect(text).toContain("可验证信号");
+    expect(text).toContain("基础 7/7 项");
+    expect(text).toContain("Tranco 全球排名：#42");
+    expect(text).toContain("Domain Rating by Ahrefs：93 / 100");
+    expect(text).toContain("不做自创评分");
+    expect(text).not.toContain("JUYU Score");
     expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
     expect(shareUrl).not.toContain("telegram_user_id");
   });
@@ -133,8 +135,8 @@ describe("referral growth messages", () => {
       },
     });
 
-    expect(text).toContain("暂时无法确认");
-    expect(text).toContain("不能据此判断可注册");
+    expect(text).toContain("当前资料不足以确认注册状态");
+    expect(text).toContain("不能据此判断这个域名是否可注册");
   });
 });
 

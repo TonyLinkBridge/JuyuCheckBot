@@ -27,6 +27,7 @@
 - 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
 - `/recent` 最近报告、15 分钟域名结果缓存、忽略缓存实时重查和安全分享推荐深链
 - Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
+- 决策型分享卡：公开分享关键结论、Tranco / Ahrefs / CrUX 可信信号和资料覆盖，不公开用户买卖意图，并把朋友导回免费体检入口
 - Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
@@ -79,7 +80,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.11.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.12.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：
