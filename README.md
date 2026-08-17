@@ -76,7 +76,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.9.0", "reportVersion": "JUYU-EVIDENCE-2.1" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：

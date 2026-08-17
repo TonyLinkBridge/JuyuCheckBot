@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from "express";
 import { webhookCallback } from "grammy";
 import { createBot } from "./bot.js";
 import { loadConfig } from "./config.js";
+import { REPORT_VERSION } from "./domain/evidence.js";
 import { landingHtml, privacyHtml } from "./privacy.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
@@ -19,7 +20,7 @@ app.get("/privacy", (_request, response) => {
   response.type("html").send(privacyHtml("JUYU 域名体检"));
 });
 app.get("/health", (_request, response) => {
-  response.status(200).json({ ok: true, service: "juyu-domain-check" });
+  response.status(200).json({ ok: true, service: "juyu-domain-check", version: "0.9.0", reportVersion: REPORT_VERSION });
 });
 app.post(TELEGRAM_WEBHOOK_PATH, async (request, response, next) => {
   if (!config.WEBHOOK_SECRET) {
