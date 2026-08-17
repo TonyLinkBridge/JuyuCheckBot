@@ -9,13 +9,13 @@ create table if not exists public.domain_reports (
   domain text not null,
   intent text check (intent is null or intent in ('owner', 'buyer', 'research')),
   -- The following legacy score columns remain only for backward compatibility.
-  -- JUYU-EVIDENCE-2.0 does not expose or calculate a proprietary domain score.
-  score smallint not null check (score between 0 and 100),
-  grade text not null check (grade in ('S', 'A', 'B', 'C', 'D')),
-  score_version text not null,
-  confidence text not null check (confidence in ('low', 'medium')),
-  data_coverage smallint not null check (data_coverage between 0 and 100),
-  dimension_scores jsonb not null default '{}'::jsonb,
+  -- JUYU-EVIDENCE-2.1 does not expose or calculate a proprietary domain score.
+  score smallint check (score between 0 and 100),
+  grade text check (grade in ('S', 'A', 'B', 'C', 'D')),
+  score_version text,
+  confidence text check (confidence in ('low', 'medium')),
+  data_coverage smallint check (data_coverage between 0 and 100),
+  dimension_scores jsonb,
   report jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -52,6 +52,24 @@ create index if not exists growth_events_source_created_idx
 create index if not exists growth_events_user_created_idx
   on public.growth_events (telegram_user_id, created_at desc);
 
+-- Idempotent upgrade for projects created with the former required score columns.
+alter table public.domain_reports alter column score drop not null;
+alter table public.domain_reports alter column grade drop not null;
+alter table public.domain_reports alter column score_version drop not null;
+alter table public.domain_reports alter column confidence drop not null;
+alter table public.domain_reports alter column data_coverage drop not null;
+alter table public.domain_reports alter column dimension_scores drop not null;
+alter table public.domain_reports alter column dimension_scores drop default;
+
+update public.domain_reports
+set score = null,
+    grade = null,
+    score_version = null,
+    confidence = null,
+    data_coverage = null,
+    dimension_scores = null
+where coalesce(report->>'reportVersion', '') like 'JUYU-EVIDENCE-%';
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -66,6 +84,28 @@ drop trigger if exists domain_reports_set_updated_at on public.domain_reports;
 create trigger domain_reports_set_updated_at
 before update on public.domain_reports
 for each row execute function public.set_updated_at();
+
+create or replace function public.clear_legacy_domain_scores()
+returns trigger
+language plpgsql
+as $$
+begin
+  if coalesce(new.report->>'reportVersion', '') like 'JUYU-EVIDENCE-%' then
+    new.score = null;
+    new.grade = null;
+    new.score_version = null;
+    new.confidence = null;
+    new.data_coverage = null;
+    new.dimension_scores = null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists domain_reports_clear_legacy_scores on public.domain_reports;
+create trigger domain_reports_clear_legacy_scores
+before insert or update on public.domain_reports
+for each row execute function public.clear_legacy_domain_scores();
 
 alter table public.domain_reports enable row level security;
 alter table public.growth_events enable row level security;

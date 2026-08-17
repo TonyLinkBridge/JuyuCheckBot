@@ -4,6 +4,7 @@ import type { DomainReport } from "../src/domain/types.js";
 import {
   commerceLink,
   fullReportKeyboard,
+  fullReportText,
   referralWelcomeKeyboard,
   referralWelcomeText,
   shareCardKeyboard,
@@ -11,7 +12,7 @@ import {
 } from "../src/messages.js";
 
 const report = {
-  reportVersion: "JUYU-EVIDENCE-2.0",
+  reportVersion: "JUYU-EVIDENCE-2.1",
   domain: "example.com",
   registrableDomain: "example.com",
   isSubdomain: false,
@@ -46,6 +47,7 @@ const report = {
     ipv6: [],
     nameServers: ["ns1.example.com"],
     mx: [],
+    source: { name: "实时 DNS 查询", url: null, checkedAt: new Date("2026-08-17T00:00:00Z") },
   },
   rdap: {
     status: "registered",
@@ -56,7 +58,13 @@ const report = {
     nameServers: ["ns1.example.com"],
     statuses: ["active"],
     dnssec: false,
-    source: { type: "rdap", name: "RDAP 注册资料", url: "https://rdap.org/domain/example.com" },
+    source: {
+      type: "rdap",
+      name: "权威 RDAP · rdap.example",
+      url: "https://rdap.example/domain/example.com",
+      authoritative: true,
+      checkedAt: new Date("2026-08-17T00:00:00Z"),
+    },
   },
 } as DomainReport;
 
@@ -69,7 +77,7 @@ describe("referral growth messages", () => {
 
     expect(text).toContain("资料取得");
     expect(text).toContain("7/7 项");
-    expect(text).toContain("RDAP 注册资料");
+    expect(text).toContain("权威 RDAP");
     expect(text).not.toContain("/ 100");
     expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
     expect(shareUrl).not.toContain("telegram_user_id");
@@ -92,7 +100,13 @@ describe("referral growth messages", () => {
       rdap: {
         ...report.rdap,
         status: "unknown",
-        source: { type: "unavailable", name: "暂未取得注册资料", url: null },
+        source: {
+          type: "unavailable",
+          name: "暂未取得注册资料",
+          url: null,
+          authoritative: false,
+          checkedAt: new Date("2026-08-17T00:00:00Z"),
+        },
       },
     });
 
@@ -114,6 +128,16 @@ describe("commerce lead messages", () => {
 
     expect(ownerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:owner:token_123");
     expect(buyerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:buyer:token_123");
+    expect(buyerKeyboard.inline_keyboard[2]?.[0]?.callback_data).toBe("refresh:token_123");
+  });
+
+  it("shows concrete DNS values, source authority and lookup times", () => {
+    const text = fullReportText(report, "research");
+
+    expect(text).toContain("192.0.2.1");
+    expect(text).toContain("ns1.example.com");
+    expect(text).toContain("权威注册局资料");
+    expect(text).toContain("取得时间");
   });
 
   it("builds a Commerce Bot deep link with the action and encoded domain", () => {

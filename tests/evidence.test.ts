@@ -11,7 +11,13 @@ const rdap: RdapResult = {
   nameServers: ["ns1.example.com"],
   statuses: ["active"],
   dnssec: false,
-  source: { type: "rdap", name: "RDAP 注册资料", url: "https://rdap.org/domain/example.com" },
+  source: {
+    type: "rdap",
+    name: "权威 RDAP · rdap.example",
+    url: "https://rdap.example/domain/example.com",
+    authoritative: true,
+    checkedAt: new Date("2026-08-17T00:00:00Z"),
+  },
 };
 
 const dns: DnsResult = {
@@ -21,6 +27,7 @@ const dns: DnsResult = {
   ipv6: [],
   nameServers: ["ns1.example.com"],
   mx: [],
+  source: { name: "实时 DNS 查询", url: null, checkedAt: new Date("2026-08-17T00:00:00Z") },
 };
 
 describe("evidence report", () => {
@@ -62,7 +69,13 @@ describe("evidence report", () => {
         expiresAt: null,
         nameServers: [],
         dnssec: null,
-        source: { type: "unavailable", name: "暂未取得注册资料", url: null },
+        source: {
+          type: "unavailable",
+          name: "暂未取得注册资料",
+          url: null,
+          authoritative: false,
+          checkedAt: new Date("2026-08-17T00:00:00Z"),
+        },
       },
       dns,
     });

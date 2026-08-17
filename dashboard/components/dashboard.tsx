@@ -57,6 +57,7 @@ const eventLabels: Record<string, string> = {
   check_failed: "域名体检失败",
   rate_limited: "触发频率限制",
   history_viewed: "查看历史报告",
+  refresh_requested: "强制实时检查",
 };
 
 const funnelLabels: Record<string, { primary: string; secondary: string }> = {
@@ -187,7 +188,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
               title="数据质量"
               description="监控外部数据、报告稳定性与体检响应速度。"
             />
-            <QualityGrid quality={data.quality} />
+            <QualityHealth quality={data.quality} />
           </section>
 
           <section id="activity" className="section-block section-last">
@@ -425,16 +426,26 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
   );
 }
 
-function QualityGrid({ quality }: { quality: DashboardData["quality"] }) {
+function QualityHealth({ quality }: { quality: DashboardData["quality"] }) {
   const items = [
     { label: "体检报告", value: String(quality.reportCount), hint: "Evidence reports · 不含自创评分", icon: Bot, tone: "neutral" },
     { label: "响应中位数", value: quality.medianDurationMs ? `${(quality.medianDurationMs / 1000).toFixed(1)}s` : "—", hint: "Median latency · Preview", icon: Clock3, tone: quality.medianDurationMs > 6000 ? "warn" : "good" },
     { label: "注册状态确认", value: formatPercent(quality.registrationConfirmedRate), hint: "RDAP / Registry WHOIS", icon: Gauge, tone: quality.registrationConfirmedRate < 0.85 ? "warn" : "good" },
-    { label: "注册局回退", value: formatPercent(quality.registryFallbackRate), hint: "Private suffix fallback", icon: Database, tone: "neutral" },
+    { label: "权威资料率", value: formatPercent(quality.authoritativeRate), hint: "IANA routed RDAP / Registry", icon: Database, tone: quality.authoritativeRate < 0.85 ? "warn" : "good" },
     { label: "缓存命中", value: formatPercent(quality.cachedRate), hint: "Cache hit · 15 分钟复用", icon: RefreshCw, tone: "neutral" },
     { label: "体检失败", value: formatPercent(quality.failureRate), hint: "Check failures · 提交→失败", icon: quality.failureRate > 0 ? XCircle : CheckCircle2, tone: quality.failureRate > 0.05 ? "bad" : "good" },
   ];
-  return <div className="quality-grid">{items.map(({ icon: Icon, ...item }) => <Card key={item.label} className="quality-card"><CardContent><div className={cn("quality-icon", item.tone)}><Icon size={16} /></div><span>{item.label}</span><strong>{item.value}</strong><small>{item.hint}</small></CardContent></Card>)}</div>;
+  return <>
+    <div className="quality-grid">{items.map(({ icon: Icon, ...item }) => <Card key={item.label} className="quality-card"><CardContent><div className={cn("quality-icon", item.tone)}><Icon size={16} /></div><span>{item.label}</span><strong>{item.value}</strong><small>{item.hint}</small></CardContent></Card>)}</div>
+    <Card className="quality-source-card">
+      <CardHeader><div><p className="card-kicker">REGISTRATION SOURCES</p><h2>资料源健康 <small>Source health</small></h2></div><Database size={18} className="muted-icon" /></CardHeader>
+      <CardContent className="table-wrap">
+        <table><thead><tr><th>资料源</th><th>类型</th><th>报告</th><th>确认状态</th><th>成功率</th></tr></thead><tbody>
+          {quality.sources.length ? quality.sources.map((source) => <tr key={source.name}><td><span className="source-name">{source.name}</span></td><td><Badge>{source.type}</Badge></td><td>{source.reports}</td><td>{source.confirmed}</td><td>{formatPercent(source.successRate)}</td></tr>) : <tr><td colSpan={5} className="empty-cell">等待新版资料报告</td></tr>}
+        </tbody></table>
+      </CardContent>
+    </Card>
+  </>;
 }
 
 function ActivityTable({ events }: { events: DashboardData["recent"] }) {

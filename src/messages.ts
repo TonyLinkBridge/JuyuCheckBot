@@ -6,8 +6,10 @@ import type { DomainIntent, DomainReport, RegistrationStatus } from "./domain/ty
 
 export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
-用数据与品牌视角，
-快速看懂一个域名。
+买下、续费或使用域名前，
+先查清注册资料、DNS 与基础警报。
+
+每项结果说明来源，不做自创评分。
 
 直接发送一个域名，例如：
 <code>example.com</code>`;
@@ -27,7 +29,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会显示注册状态、DNS、资料来源、数据完整度和基础警报。选择你的目的后，订阅 JUYU 情报局即可解锁完整可验证资料、名称结构事实与行动建议。
+免费 Preview 会显示注册状态、DNS、资料来源、资料完整度和基础警报。选择你的目的后，订阅 JUYU 情报局即可解锁完整可验证资料、具体 DNS 记录、查询时间、名称结构事实与行动建议。
 
 常用命令：
 /recent 最近体检
@@ -49,6 +51,7 @@ DNS　　　${dnsStatusLine(report)}
 资料取得　<b>${evidenceCount(report)}</b>
 基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
 资料来源　${registrationSource(report)}
+取得时间　${formatDateTime(report.rdap.source.checkedAt)}
 
 ━━━━━━━━━━━━━━
 <b>检查结论</b>
@@ -66,7 +69,9 @@ export function intentKeyboard(token: string): InlineKeyboard {
     .row()
     .text("🎯 我想购买这个域名", `intent:buyer:${token}`)
     .row()
-    .text("🔍 只是研究看看", `intent:research:${token}`);
+    .text("🔍 只是研究看看", `intent:research:${token}`)
+    .row()
+    .text("🔄 忽略缓存｜重新检查", `refresh:${token}`);
 }
 
 export function gateText(config: Config): string {
@@ -95,7 +100,6 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
   const registrar = report.rdap.registrar ? escapeHtml(report.rdap.registrar) : "未公开 / 未获取";
   const age = report.ageYears === null ? "未知" : `${formatYears(report.ageYears)} 年`;
   const dnssec = report.rdap.dnssec === null ? "未知" : report.rdap.dnssec ? "已启用" : "未启用";
-  const nsCount = new Set([...report.rdap.nameServers, ...report.dns.nameServers]).size;
   const evidenceLines = report.evidenceItems
     .map((item) => `${item.available ? "✓" : "○"} ${escapeHtml(item.label)}`)
     .join("　");
@@ -115,12 +119,25 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
 • 注册状态：${registrationLabel(report.rdap.status)}
 • 注册商：${registrar}
 • 注册日期：${formatDate(report.rdap.createdAt)}
+• 更新日期：${formatDate(report.rdap.updatedAt)}
 • 域名年龄：${age}
 • 到期日期：${formatDate(report.rdap.expiresAt)}
 • DNS 解析：${report.dns.checked === false ? "数据暂不可用" : report.dns.resolves ? "正常" : "未发现有效解析"}
-• Nameserver：${nsCount || "未发现"}
-• MX：${report.dns.mx.length ? `${report.dns.mx.length} 条` : "未发现"}
 • DNSSEC：${dnssec}
+
+<b>DNS 明细</b>
+• A：${formatValues(report.dns.ipv4)}
+• AAAA：${formatValues(report.dns.ipv6)}
+• Registry NS：${formatValues(report.rdap.nameServers)}
+• DNS NS：${formatValues(report.dns.nameServers)}
+• MX：${formatValues(report.dns.mx.map((item) => `${item.priority} ${item.exchange}`))}
+
+<b>资料出处</b>
+• 注册资料：${registrationSource(report)}
+• 权威性：${report.rdap.source.authoritative ? "权威注册局资料" : "中转或暂不可用"}
+• 取得时间：${formatDateTime(report.rdap.source.checkedAt)}
+• DNS：${escapeHtml(report.dns.source.name)}
+• DNS 时间：${formatDateTime(report.dns.source.checkedAt)}
 
 <b>已取得项目</b>
 ${evidenceLines}
@@ -167,6 +184,7 @@ export function fullReportKeyboard(
   } else {
     keyboard.row().url("🌐 查看 JUYU 官方服务", "https://www.juyu.com/");
   }
+  keyboard.row().text("🔄 重新实时检查", `refresh:${token}`);
   keyboard.row().text("🔎 继续体检", "check_another");
   return keyboard;
 }
@@ -334,6 +352,13 @@ function registrationSource(report: DomainReport): string {
   return report.rdap.source.url
     ? `<a href="${escapeHtml(report.rdap.source.url)}">${name}</a>`
     : name;
+}
+
+function formatValues(values: string[], limit = 4): string {
+  if (!values.length) return "未发现";
+  const visible = values.slice(0, limit).map(escapeHtml);
+  const remaining = values.length - visible.length;
+  return `${visible.join("、")}${remaining > 0 ? `（另有 ${remaining} 条）` : ""}`;
 }
 
 function padIndex(index: number): string {

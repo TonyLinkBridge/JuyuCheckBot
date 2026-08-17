@@ -184,6 +184,27 @@ export function createBot(config: Config): Bot {
     await ctx.editMessageText("✅ 与你的 Telegram 用户 ID 关联的 JUYU 体检数据已删除。", html);
   });
 
+  bot.callbackQuery(/^refresh:([A-Za-z0-9_-]+)$/, async (ctx) => {
+    const token = ctx.match[1];
+    if (!token) return;
+    const stored = await resolveReport(token, ctx.from.id);
+    if (!stored) {
+      await ctx.answerCallbackQuery({ text: "体检结果已过期，请重新发送域名。", show_alert: true });
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: "正在绕过缓存重新查询…" });
+    await Promise.all([
+      backend.track({
+        eventName: "refresh_requested",
+        telegramUserId: ctx.from.id,
+        source: stored.source,
+        domain: stored.report.domain,
+        reportToken: token,
+      }),
+      runCheck(ctx, stored.report.domain, true),
+    ]);
+  });
+
   bot.callbackQuery(/^history:([A-Za-z0-9_-]+)$/, async (ctx) => {
     const token = ctx.match[1];
     if (!token) return;
@@ -358,7 +379,7 @@ export function createBot(config: Config): Bot {
     else console.error("Unhandled bot error", cause instanceof Error ? cause.message : "unknown error");
   });
 
-  async function runCheck(ctx: Context, raw: string): Promise<void> {
+  async function runCheck(ctx: Context, raw: string, forceRefresh = false): Promise<void> {
     let domain;
     try {
       domain = normalizeDomain(raw);
@@ -397,7 +418,9 @@ export function createBot(config: Config): Bot {
     let report: DomainReport;
     let cached = false;
     try {
-      const cachedReport = await backend.getRecentReport(domain.ascii, REPORT_VERSION, reportCacheMs);
+      const cachedReport = forceRefresh
+        ? null
+        : await backend.getRecentReport(domain.ascii, REPORT_VERSION, reportCacheMs);
       cached = Boolean(cachedReport);
       [report] = await Promise.all([
         cachedReport ? Promise.resolve(cachedReport) : checkDomain(domain, config.CHECK_TIMEOUT_MS),
@@ -424,11 +447,15 @@ export function createBot(config: Config): Bot {
         metadata: {
           reportVersion: report.reportVersion,
           cached,
+          forcedRefresh: forceRefresh,
           dataCoverage: report.dataCoverage,
           evidenceAvailable: report.evidenceItems.filter((item) => item.available).length,
           evidenceTotal: report.evidenceItems.length,
           registrationStatus: report.rdap.status,
           registrationSource: report.rdap.source.type,
+          registrationSourceName: report.rdap.source.name,
+          registrationAuthoritative: report.rdap.source.authoritative,
+          dnsChecked: report.dns.checked,
           alertCount: report.alerts.length,
           durationMs: Date.now() - checkStartedAt,
         },

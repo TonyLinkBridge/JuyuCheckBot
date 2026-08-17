@@ -2,6 +2,7 @@ import { promises as dns } from "node:dns";
 import type { DnsResult } from "./types.js";
 
 export async function checkDns(domain: string, timeoutMs: number): Promise<DnsResult> {
+  const checkedAt = new Date();
   const withTimeout = async <T>(promise: Promise<T>): Promise<T> => {
     let timeout: NodeJS.Timeout | undefined;
     try {
@@ -37,6 +38,11 @@ export async function checkDns(domain: string, timeoutMs: number): Promise<DnsRe
     ipv6,
     nameServers: nameServers.map((name) => name.toLowerCase().replace(/\.$/, "")),
     mx: mx.sort((a, b) => a.priority - b.priority),
+    source: {
+      name: "实时 DNS 查询",
+      url: null,
+      checkedAt,
+    },
   };
 }
 
@@ -67,5 +73,13 @@ function isDefinitiveDnsAnswer(error: unknown): boolean {
 }
 
 export function emptyDnsResult(): DnsResult {
-  return { checked: false, resolves: false, ipv4: [], ipv6: [], nameServers: [], mx: [] };
+  return {
+    checked: false,
+    resolves: false,
+    ipv4: [],
+    ipv6: [],
+    nameServers: [],
+    mx: [],
+    source: { name: "实时 DNS 查询", url: null, checkedAt: new Date() },
+  };
 }

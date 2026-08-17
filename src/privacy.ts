@@ -50,7 +50,7 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#090b0
 main{max-width:680px;padding:48px 26px}.tag{color:#58d0a6;font-weight:800;letter-spacing:.08em}h1{font-size:46px;line-height:1.1;margin:14px 0}p{color:#adb5bf;font-size:19px}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}a{padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700}.primary{background:#58d0a6;color:#07100d}.secondary{border:1px solid #343b44;color:#e8eaed}
 </style></head><body><main><div class="tag">JUYU DOMAIN CHECK</div><h1>一个域名到底怎么样？</h1>
-<p>使用有明确来源的资料，快速查看域名结构、注册状态、DNS 与基础警报。</p>
+<p>买下、续费或使用域名前，先查看有明确来源和取得时间的注册资料、DNS 与基础警报。</p>
 <div class="actions"><a class="primary" href="https://t.me/${encodeURIComponent(botUsername)}">打开 Telegram 体检</a><a class="secondary" href="${channelUrl}">JUYU 情报局</a><a class="secondary" href="/privacy">隐私说明</a></div>
 </main></body></html>`;
 }

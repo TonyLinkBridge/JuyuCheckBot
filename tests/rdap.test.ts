@@ -10,6 +10,13 @@ describe("checkRdapWithRetry", () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error("temporary network failure"))
+      .mockRejectedValueOnce(new Error("fallback also unavailable"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ services: [[['com'], ['https://rdap.example/']]] }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -23,8 +30,10 @@ describe("checkRdapWithRetry", () => {
 
     const result = await checkRdapWithRetry("example.com", 4000);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(String(fetchMock.mock.calls[3]?.[0])).toBe("https://rdap.example/domain/example.com");
     expect(result.status).toBe("registered");
+    expect(result.source.authoritative).toBe(true);
     expect(result.createdAt).toEqual(new Date("2010-01-01T00:00:00Z"));
   });
 

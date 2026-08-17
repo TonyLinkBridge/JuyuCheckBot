@@ -252,6 +252,7 @@ tbody tr:hover td { background: var(--row-hover); }
 .quality-icon { width: 29px; height: 29px; display: grid; place-items: center; margin-bottom: 20px; border-radius: 7px; color: var(--text-soft); background: var(--muted); }
 .quality-icon.good { color: var(--green); background: var(--green-dim); }.quality-icon.warn { color: var(--amber); background: rgba(232,177,94,.1); }.quality-icon.bad { color: var(--red); background: rgba(239,111,114,.1); }
 .quality-card span { display: block; color: var(--text-soft); font-size: 10px; }.quality-card strong { display: block; margin-top: 8px; font-family: var(--font-geist-mono); font-size: 23px; font-weight: 500; letter-spacing: -.04em; }.quality-card small { display: block; margin-top: 9px; overflow: hidden; color: var(--text-faint); font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+.quality-source-card { margin-top: 10px; }
 
 .activity-card .px-5 { padding: 0; }.activity-card th:first-child, .activity-card td:first-child { padding-left: 18px; }.activity-card th:last-child, .activity-card td:last-child { padding-right: 18px; }
 .activity-card td:first-child { color: var(--text-medium); font-family: var(--font-geist-sans); }

@@ -1,6 +1,6 @@
 import "server-only";
 
-const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-2.0";
+const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-2.1";
 
 export const rangeOptions = [
   { value: "1d", label: "24H", days: 1 },
@@ -24,7 +24,6 @@ type GrowthEvent = {
 
 type ReportRow = {
   domain: string;
-  score_version: string;
   report: Record<string, unknown>;
   created_at: string;
 };
@@ -138,12 +137,20 @@ export type DashboardData = {
   }>;
   quality: {
     reportCount: number;
+    authoritativeRate: number;
     registrationConfirmedRate: number;
     registryFallbackRate: number;
     registrationUnknownRate: number;
     cachedRate: number;
     failureRate: number;
     medianDurationMs: number;
+    sources: Array<{
+      name: string;
+      type: string;
+      reports: number;
+      confirmed: number;
+      successRate: number;
+    }>;
   };
   recent: Array<{
     event: string;
@@ -191,7 +198,7 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         order: "created_at.asc",
       }),
       readAll<ReportRow>(url, key, "domain_reports", {
-        select: "domain,score_version,report,created_at",
+        select: "domain,report,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
         order: "created_at.asc",
       }),
@@ -279,7 +286,7 @@ function buildDashboard(
   const gateUnlocked = [...gateTokens].filter((token) => unlockedTokens.has(token)).length;
   const recovered = [...failedTokens].filter((token) => unlockedTokens.has(token)).length;
   const currentReports = reports.filter((report) => new Date(report.created_at) >= currentStart);
-  const currentEvidenceReports = currentReports.filter((report) => report.score_version === CURRENT_REPORT_VERSION);
+  const currentEvidenceReports = currentReports.filter((report) => reportVersion(report.report) === CURRENT_REPORT_VERSION);
   const previewEvents = current.filter((event) => event.event_name === "preview_shown");
   const durations = previewEvents
     .map((event) => numericMetadata(event, "durationMs"))
@@ -323,6 +330,10 @@ function buildDashboard(
     sources: buildSources(current),
     quality: {
       reportCount: currentReports.length,
+      authoritativeRate: ratio(
+        currentEvidenceReports.filter((report) => registrationAuthoritative(report.report)).length,
+        currentEvidenceReports.length,
+      ),
       registrationConfirmedRate: ratio(
         currentEvidenceReports.filter((report) => registrationStatus(report.report) !== "unknown").length,
         currentEvidenceReports.length,
@@ -344,6 +355,7 @@ function buildDashboard(
         current.filter((event) => event.event_name === "domain_submitted").length,
       ),
       medianDurationMs: median(durations),
+      sources: buildRegistrationSourceHealth(currentEvidenceReports),
     },
     recent: [...current]
       .reverse()
@@ -695,10 +707,40 @@ function registrationStatus(report: Record<string, unknown>): string {
   return typeof rdap?.status === "string" ? rdap.status : "unknown";
 }
 
+function reportVersion(report: Record<string, unknown>): string {
+  return typeof report.reportVersion === "string" ? report.reportVersion : "";
+}
+
 function registrationSource(report: Record<string, unknown>): string {
   const rdap = isRecord(report.rdap) ? report.rdap : null;
   const source = rdap && isRecord(rdap.source) ? rdap.source : null;
   return typeof source?.type === "string" ? source.type : "unavailable";
+}
+
+function registrationAuthoritative(report: Record<string, unknown>): boolean {
+  const rdap = isRecord(report.rdap) ? report.rdap : null;
+  const source = rdap && isRecord(rdap.source) ? rdap.source : null;
+  return source?.authoritative === true;
+}
+
+function registrationSourceName(report: Record<string, unknown>): string {
+  const rdap = isRecord(report.rdap) ? report.rdap : null;
+  const source = rdap && isRecord(rdap.source) ? rdap.source : null;
+  return typeof source?.name === "string" ? source.name : "暂未取得注册资料";
+}
+
+function buildRegistrationSourceHealth(reports: ReportRow[]): DashboardData["quality"]["sources"] {
+  const grouped = new Map<string, { type: string; reports: number; confirmed: number }>();
+  for (const report of reports) {
+    const name = registrationSourceName(report.report);
+    const item = grouped.get(name) ?? { type: registrationSource(report.report), reports: 0, confirmed: 0 };
+    item.reports += 1;
+    if (registrationStatus(report.report) !== "unknown") item.confirmed += 1;
+    grouped.set(name, item);
+  }
+  return [...grouped.entries()]
+    .map(([name, item]) => ({ ...item, name, successRate: ratio(item.confirmed, item.reports) }))
+    .sort((a, b) => b.reports - a.reports || a.name.localeCompare(b.name));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -757,12 +799,14 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
     sources: [],
     quality: {
       reportCount: 0,
+      authoritativeRate: 0,
       registrationConfirmedRate: 0,
       registryFallbackRate: 0,
       registrationUnknownRate: 0,
       cachedRate: 0,
       failureRate: 0,
       medianDurationMs: 0,
+      sources: [],
     },
     recent: [],
   };

@@ -17,7 +17,8 @@ export type GrowthEventName =
   | "share_generated"
   | "referral_opened"
   | "commerce_handoff"
-  | "history_viewed";
+  | "history_viewed"
+  | "refresh_requested";
 
 export type GrowthEvent = {
   eventName: GrowthEventName;
@@ -227,8 +228,8 @@ class SupabaseBackend implements Backend {
         source: record.source,
         domain: record.report.domain,
         intent: record.intent ?? null,
-        // Legacy columns remain populated for compatibility with the existing Supabase schema.
-        // They are no longer exposed as a JUYU domain score.
+        // Sent only for wire compatibility with Supabase projects created from the old schema.
+        // The evidence-schema migration nulls these values with a database trigger.
         score: 0,
         grade: "D",
         score_version: record.report.reportVersion,
@@ -275,7 +276,7 @@ class SupabaseBackend implements Backend {
   async getRecentReport(domain: string, reportVersion: string, maxAgeMs: number): Promise<DomainReport | null> {
     const query = new URLSearchParams({
       domain: `eq.${domain}`,
-      score_version: `eq.${reportVersion}`,
+      "report->>reportVersion": `eq.${reportVersion}`,
       created_at: `gte.${new Date(Date.now() - maxAgeMs).toISOString()}`,
       select: "report",
       order: "created_at.desc",
@@ -421,11 +422,15 @@ function reviveDomainReport(value: unknown): DomainReport | null {
           type: rdapValue.source.type,
           name: typeof rdapValue.source.name === "string" ? rdapValue.source.name : "注册资料",
           url: typeof rdapValue.source.url === "string" ? rdapValue.source.url : null,
+          authoritative: rdapValue.source.authoritative === true,
+          checkedAt: reviveDate(rdapValue.source.checkedAt) ?? checkedAt,
         }
       : {
           type: rdapValue.status === "registered" || rdapValue.status === "available" ? "rdap" : "unavailable",
           name: rdapValue.status === "registered" || rdapValue.status === "available" ? "RDAP 注册资料" : "暂未取得注册资料",
           url: null,
+          authoritative: false,
+          checkedAt,
         },
   };
   const dnsValue = isRecord(value.dns) ? value.dns : {};
@@ -441,6 +446,13 @@ function reviveDomainReport(value: unknown): DomainReport | null {
           priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 0,
         })).filter((item) => item.exchange)
       : [],
+    source: isRecord(dnsValue.source)
+      ? {
+          name: typeof dnsValue.source.name === "string" ? dnsValue.source.name : "实时 DNS 查询",
+          url: typeof dnsValue.source.url === "string" ? dnsValue.source.url : null,
+          checkedAt: reviveDate(dnsValue.source.checkedAt) ?? checkedAt,
+        }
+      : { name: "实时 DNS 查询", url: null, checkedAt },
   };
   const registrableDomain = typeof value.registrableDomain === "string" ? value.registrableDomain : value.domain;
   const isIdn = value.isIdn === true;

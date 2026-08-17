@@ -15,23 +15,23 @@
 当前 MVP 已实现：
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
-- 免费 RDAP 注册信息与原生 DNS 检查，不使用演示数据
-- `JUYU-EVIDENCE-2.0` 证据型报告：注册资料、DNS、来源、取得项目与基础警报，不提供自创总分
+- 通过 IANA Bootstrap 直达权威注册局 RDAP，并进行原生 DNS 检查，不使用演示数据
+- `JUYU-EVIDENCE-2.1` 证据型报告：注册资料、具体 DNS、资料来源、取得时间、资料完整度与基础警报，不提供自创总分
 - ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
-- Preview → 意图 → Growth Gate → `DATA / JUYU ANALYSIS / ACTION` 报告
+- Preview → 意图 → Growth Gate → `DATA / STRUCTURE / ACTION` 报告
 - `getChatMember` 频道订阅验证和完整报告 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
 - Supabase REST 后端持久保存并按用户安全读回报告，支持 Vercel 跨实例解锁
 - 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
-- `/recent` 最近报告、15 分钟域名结果缓存和安全分享推荐深链
+- `/recent` 最近报告、15 分钟域名结果缓存、忽略缓存实时重查和安全分享推荐深链
 - Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
 - Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - 对 RDAP、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
 - 推荐打开按独立用户计数，最近报告按域名去重
-- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与数据健康监控
+- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与逐注册资料源健康监控
 - Dashboard Poll 引流发布器：测试/正式频道双目标、服务器端 Token、正式发布确认与 `src_` Campaign 自动归因
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
@@ -125,7 +125,7 @@ npm run dashboard:dev
 2. 将 `@JuyuCheckBot` 加为 `@JUYU007` 的频道管理员。Telegram 要求 Bot 具备相应访问权限，才能可靠调用 `getChatMember` 验证其他用户的订阅状态。
 3. 用 `/setdescription` 设置：
 
-   > 输入一个域名，快速查看注册信息、结构、历史、DNS 与基础风险。免费域名体检，由 JUYU 聚域提供。
+   > 输入一个域名，快速查看注册信息、结构、DNS、资料来源与基础警报。免费域名体检，由 JUYU 聚域提供。
 
 4. 用 `/setabouttext` 设置：
 
@@ -149,13 +149,13 @@ npm run dashboard:dev
 
 ## Evidence Report 边界
 
-`JUYU-EVIDENCE-2.0` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。报告只显示取得的注册资料、DNS 结果、明确来源、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
+`JUYU-EVIDENCE-2.1` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局；报告显示取得的注册资料、具体 DNS、明确来源、查询时间、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
 
 ## Supabase 后端
 
 本地开发可以使用内存模式；Vercel 生产部署必须使用 Supabase，否则函数扩缩实例后无法可靠解锁先前生成的报告。
 
-1. 在 Supabase SQL Editor 执行 `supabase/schema.sql`。
+1. 新项目在 Supabase SQL Editor 执行 `supabase/schema.sql`；旧项目再执行 `supabase/evidence-schema-migration.sql`，清空旧版评分字段。
 2. 在服务器环境变量填写 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。
 3. 重新部署或重启 Bot；日志出现 `Backend mode: Supabase` 即表示已启用。
 

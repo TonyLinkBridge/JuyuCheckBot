@@ -6,6 +6,14 @@ export type RegistrationSource = {
   type: RegistrationSourceType;
   name: string;
   url: string | null;
+  authoritative: boolean;
+  checkedAt: Date;
+};
+
+export type DnsSource = {
+  name: string;
+  url: string | null;
+  checkedAt: Date;
 };
 
 export type RdapResult = {
@@ -27,6 +35,7 @@ export type DnsResult = {
   ipv6: string[];
   nameServers: string[];
   mx: Array<{ exchange: string; priority: number }>;
+  source: DnsSource;
 };
 
 export type DomainIntent = "owner" | "buyer" | "research";
