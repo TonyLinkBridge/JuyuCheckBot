@@ -28,6 +28,8 @@ import {
   referralWelcomeText,
   shareCardKeyboard,
   shareCardText,
+  technicalReportKeyboard,
+  technicalReportText,
   verificationUnavailableText,
   welcomeKeyboard,
   welcomeText,
@@ -251,6 +253,32 @@ export function createBot(config: Config): Bot {
       ctx.reply(shareCardText(stored.report), {
         ...html,
         reply_markup: shareCardKeyboard(config, stored.report, token),
+      }),
+    ]);
+  });
+
+  bot.callbackQuery(/^technical:(owner|buyer|research):([A-Za-z0-9_-]+)$/, async (ctx) => {
+    const intent = ctx.match[1] as DomainIntent;
+    const token = ctx.match[2];
+    if (!token) return;
+    const stored = await resolveReport(token, ctx.from.id);
+    if (!stored) {
+      await ctx.answerCallbackQuery({ text: "报告不存在或已过期。", show_alert: true });
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: "已打开技术资料" });
+    await Promise.all([
+      backend.track({
+        eventName: "technical_details_viewed",
+        telegramUserId: ctx.from.id,
+        source: stored.source,
+        domain: stored.report.domain,
+        reportToken: token,
+        intent,
+      }),
+      ctx.reply(technicalReportText(stored.report), {
+        ...html,
+        reply_markup: technicalReportKeyboard(token),
       }),
     ]);
   });

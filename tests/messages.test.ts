@@ -9,10 +9,11 @@ import {
   referralWelcomeText,
   shareCardKeyboard,
   shareCardText,
+  technicalReportText,
 } from "../src/messages.js";
 
 const report = {
-  reportVersion: "JUYU-EVIDENCE-3.0",
+  reportVersion: "JUYU-EVIDENCE-3.1",
   domain: "example.com",
   registrableDomain: "example.com",
   isSubdomain: false,
@@ -148,13 +149,26 @@ describe("commerce lead messages", () => {
     const ownerKeyboard = fullReportKeyboard(config, report, "owner", "token_123");
     const buyerKeyboard = fullReportKeyboard(config, report, "buyer", "token_123");
 
-    expect(ownerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:owner:token_123");
-    expect(buyerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:buyer:token_123");
+    expect(ownerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:owner:token_123");
+    expect(buyerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:buyer:token_123");
+    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "technical:buyer:token_123")).toBe(true);
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
   });
 
-  it("shows concrete DNS values, source authority and lookup times", () => {
+  it("leads with a decision, evidence and JUYU action", () => {
     const text = fullReportText(report, "research");
+
+    expect(text).toContain("一句话结论");
+    expect(text).toContain("为什么这样判断");
+    expect(text).toContain("JUYU 建议");
+    expect(text).toContain("第三方资料：<b>4/4 项</b>");
+    expect(text).toContain("Tranco 全球排名 #42");
+    expect(text).not.toContain("192.0.2.1");
+    expect(text.length).toBeLessThan(4096);
+  });
+
+  it("keeps raw DNS values and source times in the secondary technical report", () => {
+    const text = technicalReportText(report);
 
     expect(text).toContain("192.0.2.1");
     expect(text).toContain("ns1.example.com");
@@ -162,8 +176,6 @@ describe("commerce lead messages", () => {
     expect(text).toContain("取得时间");
     expect(text).toContain("Tranco 全球排名：<b>#42</b>");
     expect(text).toContain("Chrome UX Report（Google 真实用户 p75）");
-    expect(text).toContain("Domain Rating by");
-    expect(text).toContain("Internet Archive 网站历史");
     expect(text.length).toBeLessThan(4096);
   });
 

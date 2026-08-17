@@ -1,6 +1,6 @@
 import type { DnsResult, DomainReport, EvidenceItem, RdapResult, StructureFacts } from "./types.js";
 
-export const REPORT_VERSION = "JUYU-EVIDENCE-3.0";
+export const REPORT_VERSION = "JUYU-EVIDENCE-3.1";
 
 type EvidenceInput = {
   domain: string;

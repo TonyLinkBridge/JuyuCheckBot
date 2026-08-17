@@ -16,7 +16,7 @@
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
 - 通过 IANA Bootstrap 直达权威注册局 RDAP，并进行原生 DNS 检查，不使用演示数据
-- `JUYU-EVIDENCE-3.0` 证据型报告：注册资料、具体 DNS、资料来源、取得时间、资料完整度与基础警报，不提供自创总分
+- `JUYU-EVIDENCE-3.1` 决策型证据报告：先说明结论、依据、注意事项与 JUYU 下一步，原始 DNS 和来源资料按需展开，不提供自创总分
 - 免费第三方事实层：Tranco 全球排名、Internet Archive 网站历史，以及配置免费 Key 后的 Chrome UX Report 与 Ahrefs Domain Rating
 - ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
 - Preview → 意图 → Growth Gate → `DATA / STRUCTURE / ACTION` 报告
@@ -79,7 +79,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.10.0", "reportVersion": "JUYU-EVIDENCE-3.0" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.11.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：
@@ -152,7 +152,7 @@ npm run dashboard:dev
 
 ## Evidence Report 边界
 
-`JUYU-EVIDENCE-3.0` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局；报告显示取得的注册资料、具体 DNS、明确来源、查询时间、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。
+`JUYU-EVIDENCE-3.1` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。主报告根据买家、持有人或研究者身份，先输出一句话结论、证据、注意事项与 JUYU 行动建议；原始 DNS、来源时间和结构事实通过二级技术资料页查看。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。
 
 第三方资料严格按来源原名显示：Tranco 排名不换算成 JUYU 分数；Chrome UX Report 显示 Google 汇总的真实 Chrome 用户 p75 数据；Ahrefs 显示 `Domain Rating by Ahrefs` 并保留官方归属；Internet Archive 只显示可点击的公开快照日期。第三方没有收录、Key 未配置、请求失败会分别显示，彼此不混为“低分”。
 

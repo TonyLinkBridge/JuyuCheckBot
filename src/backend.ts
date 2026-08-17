@@ -19,7 +19,8 @@ export type GrowthEventName =
   | "referral_opened"
   | "commerce_handoff"
   | "history_viewed"
-  | "refresh_requested";
+  | "refresh_requested"
+  | "technical_details_viewed";
 
 export type GrowthEvent = {
   eventName: GrowthEventName;
