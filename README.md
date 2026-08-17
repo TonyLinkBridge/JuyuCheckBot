@@ -19,7 +19,8 @@
 - `JUYU-EVIDENCE-3.1` 决策型证据报告：先说明结论、依据、注意事项与 JUYU 下一步，原始 DNS 和来源资料按需展开，不提供自创总分
 - 免费第三方事实层：Tranco 全球排名、Internet Archive 网站历史，以及配置免费 Key 后的 Chrome UX Report 与 Ahrefs Domain Rating
 - ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
-- Preview → 意图 → Growth Gate → `DATA / STRUCTURE / ACTION` 报告
+- Preview → 意图 → Growth Gate → `结论 / 依据 / 注意事项 / JUYU 建议` 决策报告
+- Value-first 首屏与 Preview：订阅前先显示注册、DNS、Tranco / Ahrefs / CrUX 公开信号、资料覆盖与快速结论，再询问用户目的
 - `getChatMember` 频道订阅验证和完整报告 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
@@ -80,7 +81,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.12.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.13.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：

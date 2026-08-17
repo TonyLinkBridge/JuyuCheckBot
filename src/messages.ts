@@ -6,10 +6,15 @@ import type { DomainIntent, DomainReport, RegistrationStatus } from "./domain/ty
 
 export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
-买下、续费或使用域名前，
-先查清注册资料、DNS 与基础警报。
+一个域名值得买、继续持有，
+还是需要进一步核查？
 
-每项结果说明来源，不做自创评分。
+直接发送域名，免费查看：
+✓ 权威注册资料与到期时间
+✓ DNS、网站使用与公开历史信号
+✓ Tranco、Google CrUX 与 Ahrefs DR（有资料时）
+
+每项结果注明来源；没有资料就明确说明，不做自创评分。
 
 直接发送一个域名，例如：
 <code>example.com</code>`;
@@ -29,7 +34,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会显示注册状态、DNS、资料来源、资料完整度和基础警报。选择你的目的后，订阅 JUYU 情报局即可解锁完整可验证资料、具体 DNS 记录、查询时间、名称结构事实与行动建议。
+免费 Preview 会先显示注册状态、DNS、第三方公开信号、资料覆盖和快速结论。选择你的目的后，订阅 JUYU 情报局即可解锁判断依据、值得注意的问题、JUYU 行动建议，以及可展开的完整技术资料。
 
 常用命令：
 /recent 最近体检
@@ -38,7 +43,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 <i>结果仅供初步筛查，不替代商标、法律、安全、估值或交易尽调。</i>`;
 
 export function checkingText(domain: string): string {
-  return `🔍 正在分析 <b>${escapeHtml(domain)}</b>…`;
+  return `🔍 正在查询 <b>${escapeHtml(domain)}</b> 的权威资料与第三方公开信号…`;
 }
 
 export function previewReportText(report: DomainReport): string {
@@ -48,24 +53,23 @@ export function previewReportText(report: DomainReport): string {
 
 注册资料　${registrationStatusLine(report.rdap.status)}
 DNS　　　${dnsStatusLine(report)}
-资料取得　<b>${evidenceCount(report)}</b>
-基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
-资料来源　${registrationSource(report)}
-取得时间　${formatDateTime(report.rdap.source.checkedAt)}
+网站信号　${previewSignalLine(report)}
+资料覆盖　基础 <b>${evidenceCount(report)}</b> · 第三方 <b>${externalEvidenceCount(report)}</b>
+值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
 
 ━━━━━━━━━━━━━━
-<b>检查结论</b>
-${escapeHtml(report.summary)}
+<b>快速结论</b>
+${escapeHtml(decisionConclusion(report, "research"))}
 
-<i>这里只显示可验证资料与明确规则，不提供自创域名评分或估值。</i>`;
+<i>免费 Preview 已提供部分真实价值。选择你的目的后，解锁针对性的 JUYU 建议与完整证据。</i>`;
 }
 
-export const intentPromptText = `为了给你更准确的行动建议：
-<b>你和这个域名是什么关系？</b>`;
+export const intentPromptText = `为了给你真正有用的下一步：
+<b>你查这个域名，是为了什么？</b>`;
 
 export function intentKeyboard(token: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text("💼 我拥有这个域名", `intent:owner:${token}`)
+    .text("💼 我是域名持有人", `intent:owner:${token}`)
     .row()
     .text("🎯 我想购买这个域名", `intent:buyer:${token}`)
     .row()
@@ -83,6 +87,8 @@ export function gateText(config: Config): string {
 ✓ 真正值得注意的问题和资料缺口
 ✓ 根据买家 / 持有人 / 研究目的生成 JUYU 建议
 ✓ 需要时展开完整技术资料与来源
+
+先获得价值，再决定是否让 JUYU 协助收购、出售、注册或进一步评估。
 
 免费订阅
 <b>${escapeHtml(config.CHANNEL_NAME)}</b>
@@ -489,6 +495,20 @@ function shareSignalLines(report: DomainReport): string {
     if (ratings.length) items.push(`Google CrUX：${ratings.join(" · ")}`);
   }
   return items.slice(0, 5).map((item) => `• ${escapeHtml(item)}`).join("\n");
+}
+
+function previewSignalLine(report: DomainReport): string {
+  const signals: string[] = [];
+  const tranco = report.intelligence.tranco;
+  if (tranco.status === "available" && tranco.rank !== null) {
+    signals.push(`Tranco #${formatInteger(tranco.rank)}`);
+  }
+  const ahrefs = report.intelligence.ahrefs;
+  if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
+    signals.push(`Ahrefs DR ${formatDecimal(ahrefs.domainRating)}`);
+  }
+  if (report.intelligence.crux.status === "available") signals.push("Google CrUX 已收录");
+  return signals.length ? signals.map(escapeHtml).join(" · ") : "本次未取得公开网站信号";
 }
 
 function shareAttentionCount(report: DomainReport): number {

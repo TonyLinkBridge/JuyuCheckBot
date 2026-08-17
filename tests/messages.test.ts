@@ -5,6 +5,7 @@ import {
   commerceLink,
   fullReportKeyboard,
   fullReportText,
+  previewReportText,
   referralWelcomeKeyboard,
   referralWelcomeText,
   shareCardKeyboard,
@@ -155,6 +156,17 @@ describe("commerce lead messages", () => {
     expect(buyerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:buyer:token_123");
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "technical:buyer:token_123")).toBe(true);
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
+  });
+
+  it("gives useful third-party signals before the subscription gate", () => {
+    const text = previewReportText(report);
+
+    expect(text).toContain("快速结论");
+    expect(text).toContain("Tranco #42");
+    expect(text).toContain("Ahrefs DR 93");
+    expect(text).toContain("Google CrUX 已收录");
+    expect(text).toContain("第三方 <b>4/4 项</b>");
+    expect(text).toContain("选择你的目的后");
   });
 
   it("leads with a decision, evidence and JUYU action", () => {
