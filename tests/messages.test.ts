@@ -5,6 +5,8 @@ import {
   commerceLink,
   fullReportKeyboard,
   fullReportText,
+  juchaDomainLink,
+  juchaHandoffLink,
   previewReportText,
   referralWelcomeKeyboard,
   referralWelcomeText,
@@ -102,7 +104,7 @@ describe("referral growth messages", () => {
     expect(text).toContain("可验证信号");
     expect(text).toContain("基础 7/7 项");
     expect(text).toContain("Tranco 全球排名：#42");
-    expect(text).toContain("Domain Rating by Ahrefs：93 / 100");
+    expect(text).not.toContain("Domain Rating by Ahrefs：93 / 100");
     expect(text).toContain("不做自创评分");
     expect(text).not.toContain("JUYU Score");
     expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
@@ -148,13 +150,15 @@ describe("commerce lead messages", () => {
     COMMERCE_BOT_USERNAME: "JuyuDomainBot",
   });
 
-  it("uses tracked callback buttons before handing owners and buyers to Commerce Bot", () => {
+  it("routes commercial intent to Commerce Bot and complete research to Jucha", () => {
     const ownerKeyboard = fullReportKeyboard(config, report, "owner", "token_123");
     const buyerKeyboard = fullReportKeyboard(config, report, "buyer", "token_123");
+    const researchKeyboard = fullReportKeyboard(config, report, "research", "token_123");
 
     expect(ownerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:owner:token_123");
     expect(buyerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:buyer:token_123");
-    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "technical:buyer:token_123")).toBe(true);
+    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.url?.startsWith("https://www.jucha.com/juhe/"))).toBe(true);
+    expect(researchKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
   });
 
@@ -163,9 +167,10 @@ describe("commerce lead messages", () => {
 
     expect(text).toContain("快速结论");
     expect(text).toContain("Tranco #42");
-    expect(text).toContain("Ahrefs DR 93");
-    expect(text).toContain("Google CrUX 已收录");
-    expect(text).toContain("第三方 <b>4/4 项</b>");
+    expect(text).not.toContain("Ahrefs DR 93");
+    expect(text).not.toContain("Google CrUX 已收录");
+    expect(text).not.toContain("第三方 <b>4/4 项</b>");
+    expect(text).toContain("域名年龄");
     expect(text).toContain("选择你的目的后");
   });
 
@@ -175,7 +180,8 @@ describe("commerce lead messages", () => {
     expect(text).toContain("一句话结论");
     expect(text).toContain("为什么这样判断");
     expect(text).toContain("JUYU 建议");
-    expect(text).toContain("第三方资料：<b>4/4 项</b>");
+    expect(text).toContain("完整查询在聚查");
+    expect(text).toContain("历史 WHOIS");
     expect(text).toContain("Tranco 全球排名 #42");
     expect(text).not.toContain("192.0.2.1");
     expect(text.length).toBeLessThan(4096);
@@ -197,5 +203,20 @@ describe("commerce lead messages", () => {
     expect(commerceLink("JuyuDomainBot", "buy", "example.com")).toBe(
       "https://t.me/JuyuDomainBot?start=buy_example-com",
     );
+  });
+
+  it("builds a tracked Jucha handoff without exposing a Telegram user ID", () => {
+    const trackedConfig = loadConfig({
+      BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+      WEBHOOK_URL: "https://juyu-check-bot.vercel.app",
+      WEBHOOK_SECRET: "valid_webhook_secret",
+    });
+    const handoff = juchaHandoffLink(trackedConfig, "example.com", "research", "token_123");
+    const destination = juchaDomainLink("https://www.jucha.com/juhe/", "example.com", "research");
+
+    expect(handoff).toBe("https://juyu-check-bot.vercel.app/go/jucha?report=token_123&intent=research");
+    expect(handoff).not.toContain("telegram_user_id");
+    expect(destination).toContain("domain=example.com");
+    expect(destination).toContain("utm_campaign=juyu_domain_check");
   });
 });

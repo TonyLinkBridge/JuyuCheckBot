@@ -54,6 +54,8 @@ const eventLabels: Record<string, string> = {
   share_generated: "生成分享卡",
   referral_opened: "打开推荐链接",
   commerce_handoff: "进入聚域助手",
+  jucha_handoff: "进入聚查完整查询",
+  technical_details_viewed: "查看技术资料",
   check_failed: "域名体检失败",
   rate_limited: "触发频率限制",
   history_viewed: "查看历史报告",
@@ -154,7 +156,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
             <SectionHeading
               eyebrow="LEAD CONVERSION"
               title="潜在客户"
-              description="识别想购买、出售或注册域名的用户，并追踪 JUYU 商业服务导流。"
+              description="普通查询导向聚查消费，明确买卖需求导向 JUYU 聚域助手。"
             />
             <LeadConversion leads={data.leads} />
           </section>
@@ -381,6 +383,7 @@ function ReferralLoop({ referral }: { referral: DashboardData["referral"] }) {
 
 function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
   const metrics = [
+    { label: "进入聚查", value: String(leads.juchaUsers), hint: `${formatPercent(leads.juchaHandoffRate)} of unlocked users` },
     { label: "商业意向用户", value: String(leads.commercialIntentUsers), hint: "Owner + Buyer" },
     { label: "进入聚域助手", value: String(leads.handoffUsers), hint: `${formatPercent(leads.handoffRate)} of commercial intent` },
     { label: "完成资料提交", value: String(leads.submittedUsers), hint: `${leads.submittedLeads} completed lead forms` },

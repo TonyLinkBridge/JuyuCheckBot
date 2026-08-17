@@ -6,15 +6,16 @@ import type { DomainIntent, DomainReport, RegistrationStatus } from "./domain/ty
 
 export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
-一个域名值得买、继续持有，
-还是需要进一步核查？
+一个域名值得继续查、准备买卖，
+还是需要 JUYU 协助？
 
 直接发送域名，免费查看：
-✓ 权威注册资料与到期时间
-✓ DNS、网站使用与公开历史信号
-✓ Tranco、Google CrUX 与 Ahrefs DR（有资料时）
+✓ 注册状态、域龄与 DNS 概况
+✓ 一项可验证的公开网站信号
+✓ 基础警报与下一步方向
 
-每项结果注明来源；没有资料就明确说明，不做自创评分。
+完整历史、风险、备案与 SEO 查询会引导到聚查；
+明确的购买或出售需求会进入 JUYU 聚域助手。
 
 直接发送一个域名，例如：
 <code>example.com</code>`;
@@ -34,7 +35,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会先显示注册状态、DNS、第三方公开信号、资料覆盖和快速结论。选择你的目的后，订阅 JUYU 情报局即可解锁判断依据、值得注意的问题、JUYU 行动建议，以及可展开的完整技术资料。
+免费 Preview 会先显示注册状态、域龄、DNS、一个公开信号和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、风险、备案或 SEO 资料时进入聚查，准备购买或出售时进入 JUYU 聚域助手。
 
 常用命令：
 /recent 最近体检
@@ -52,16 +53,16 @@ export function previewReportText(report: DomainReport): string {
 🌐 <b>${escapeHtml(report.domain)}</b>
 
 注册资料　${registrationStatusLine(report.rdap.status)}
+域名年龄　${report.ageYears === null ? "○ 暂未取得" : `<b>${formatYears(report.ageYears)} 年</b>`}
 DNS　　　${dnsStatusLine(report)}
 网站信号　${previewSignalLine(report)}
-资料覆盖　基础 <b>${evidenceCount(report)}</b> · 第三方 <b>${externalEvidenceCount(report)}</b>
 值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
 
 ━━━━━━━━━━━━━━
 <b>快速结论</b>
 ${escapeHtml(decisionConclusion(report, "research"))}
 
-<i>免费 Preview 已提供部分真实价值。选择你的目的后，解锁针对性的 JUYU 建议与完整证据。</i>`;
+<i>这是免费初筛，不代替完整尽调。选择你的目的后查看下一步。</i>`;
 }
 
 export const intentPromptText = `为了给你真正有用的下一步：
@@ -79,16 +80,15 @@ export function intentKeyboard(token: string): InlineKeyboard {
 }
 
 export function gateText(config: Config): string {
-  return `🔒 <b>解锁完整 JUYU 域名体检</b>
+  return `🔒 <b>解锁 JUYU 进阶体检摘要</b>
 
-完整报告包含：
+进阶摘要包含：
 ✓ 一句话说明这个域名现在是什么情况
-✓ 注册、DNS 与第三方数据作为判断依据
-✓ 真正值得注意的问题和资料缺口
-✓ 根据买家 / 持有人 / 研究目的生成 JUYU 建议
-✓ 需要时展开完整技术资料与来源
+✓ 最重要的 2–3 项可验证依据
+✓ 需要继续核查的重点
+✓ 根据买家 / 持有人 / 研究目的给出下一步
 
-先获得价值，再决定是否让 JUYU 协助收购、出售、注册或进一步评估。
+完整历史、备案、黑名单、平台风险、SEO 与价格资料，需前往聚查继续查询。
 
 免费订阅
 <b>${escapeHtml(config.CHANNEL_NAME)}</b>
@@ -103,14 +103,15 @@ export function gateKeyboard(config: Config, token: string, intent: DomainIntent
 }
 
 export function fullReportText(report: DomainReport, intent: DomainIntent): string {
-  const evidence = decisionEvidence(report).map((item) => `• ${escapeHtml(item)}`).join("\n");
-  const attention = decisionAttention(report).map((item) => `• ${escapeHtml(item)}`).join("\n");
+  const evidenceItems = decisionEvidence(report).slice(0, 3);
+  const attentionItems = decisionAttention(report);
+  const evidence = evidenceItems.map((item) => `• ${escapeHtml(item)}`).join("\n");
+  const attention = attentionItems.slice(0, 2).map((item) => `• ${escapeHtml(item)}`).join("\n");
+  const remainingAttention = Math.max(0, attentionItems.length - 2);
 
-  return `🔓 <b>JUYU 域名体检</b>
+  return `🔓 <b>JUYU 进阶体检摘要</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-基础资料：<b>${evidenceCount(report)}</b>
-第三方资料：<b>${externalEvidenceCount(report)}</b>
 
 ━━━━━━━━━━━━━━
 💡 <b>一句话结论</b>
@@ -124,15 +125,21 @@ ${evidence}
 
 ⚠️ <b>值得注意</b>
 
-${attention}
+${attention}${remainingAttention ? `\n• 另有 ${remainingAttention} 项建议到聚查继续核验` : ""}
 
 ━━━━━━━━━━━━━━
 🎯 <b>JUYU 建议</b>
 
 ${escapeHtml(actionAdvice(report, intent))}
 
+━━━━━━━━━━━━━━
+🔎 <b>完整查询在聚查</b>
+
+网站历史 · 历史 WHOIS · ICP 备案 · 黑名单
+平台风险 · SEO 数据 · 历史价格 · 批量导出
+
 <i>${escapeHtml(report.reportVersion)} · ${formatDateTime(report.checkedAt)}
-第三方数据负责提供证据，JUYU 根据你的目的解释下一步。本报告不是估值、商标、法律或交易意见。</i>`;
+Bot 只提供初筛摘要，不代替聚查完整查询、估值、商标、法律或交易尽调。</i>`;
 }
 
 export function technicalReportText(report: DomainReport): string {
@@ -214,11 +221,12 @@ export function fullReportKeyboard(
         `lead:buyer:${token}`,
       );
   } else {
-    keyboard.url("🌐 查看 JUYU 官方服务", "https://www.juyu.com/");
+    keyboard.url("🔓 去聚查查看完整尽调", juchaHandoffLink(config, report.domain, intent, token));
   }
-  keyboard.row().text("📋 查看完整技术资料", `technical:${intent}:${token}`);
+  if (intent !== "research") {
+    keyboard.row().url("🔎 去聚查查看完整资料", juchaHandoffLink(config, report.domain, intent, token));
+  }
   keyboard.row().text("📤 生成分享卡", `share:${intent}:${token}`);
-  keyboard.row().url("®️ WIPO 官方商标查询", "https://branddb.wipo.int/");
   keyboard.row().text("🔄 重新实时检查", `refresh:${token}`);
   keyboard.row().text("🔎 继续体检", "check_another");
   return keyboard;
@@ -353,6 +361,31 @@ export function commerceLink(botUsername: string, action: string, domain: string
   return payload.length <= 64
     ? `https://t.me/${botUsername}?start=${encodeURIComponent(payload)}`
     : `https://t.me/${botUsername}`;
+}
+
+export function juchaHandoffLink(
+  config: Pick<Config, "JUCHA_URL" | "WEBHOOK_URL">,
+  domain: string,
+  intent: DomainIntent,
+  reportToken: string,
+): string {
+  if (config.WEBHOOK_URL) {
+    const url = new URL("/go/jucha", config.WEBHOOK_URL);
+    url.searchParams.set("report", reportToken);
+    url.searchParams.set("intent", intent);
+    return url.toString();
+  }
+  return juchaDomainLink(config.JUCHA_URL, domain, intent);
+}
+
+export function juchaDomainLink(baseUrl: string, domain: string, intent: DomainIntent = "research"): string {
+  const url = new URL(baseUrl);
+  if (domain) url.searchParams.set("domain", domain);
+  url.searchParams.set("utm_source", "telegram");
+  url.searchParams.set("utm_medium", "bot");
+  url.searchParams.set("utm_campaign", "juyu_domain_check");
+  url.searchParams.set("utm_content", intent);
+  return url.toString();
 }
 
 function actionAdvice(report: DomainReport, intent: DomainIntent): string {
@@ -494,21 +527,20 @@ function shareSignalLines(report: DomainReport): string {
     ].filter((value): value is string => value !== null);
     if (ratings.length) items.push(`Google CrUX：${ratings.join(" · ")}`);
   }
-  return items.slice(0, 5).map((item) => `• ${escapeHtml(item)}`).join("\n");
+  return items.slice(0, 3).map((item) => `• ${escapeHtml(item)}`).join("\n");
 }
 
 function previewSignalLine(report: DomainReport): string {
-  const signals: string[] = [];
   const tranco = report.intelligence.tranco;
   if (tranco.status === "available" && tranco.rank !== null) {
-    signals.push(`Tranco #${formatInteger(tranco.rank)}`);
+    return escapeHtml(`Tranco #${formatInteger(tranco.rank)}`);
   }
   const ahrefs = report.intelligence.ahrefs;
   if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
-    signals.push(`Ahrefs DR ${formatDecimal(ahrefs.domainRating)}`);
+    return escapeHtml(`Ahrefs DR ${formatDecimal(ahrefs.domainRating)}`);
   }
-  if (report.intelligence.crux.status === "available") signals.push("Google CrUX 已收录");
-  return signals.length ? signals.map(escapeHtml).join(" · ") : "本次未取得公开网站信号";
+  if (report.intelligence.crux.status === "available") return "Google CrUX 已收录";
+  return "本次未取得公开网站信号";
 }
 
 function shareAttentionCount(report: DomainReport): number {

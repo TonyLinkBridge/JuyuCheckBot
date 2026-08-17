@@ -213,7 +213,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .referral-stage b { color: var(--text-strong); font-family: var(--font-geist-mono); font-size: 15px; font-weight: 520; text-align: right; }
 .referral-domains-card .table-wrap { padding-top: 14px; }
 
-.lead-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.lead-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .lead-metric-card .px-5 { padding: 15px; }
 .lead-metric-card span, .lead-metric-card small { display: block; overflow: hidden; color: var(--text-faint); white-space: nowrap; text-overflow: ellipsis; }
 .lead-metric-card span { font-size: 9px; font-weight: 550; letter-spacing: .03em; }
@@ -320,6 +320,7 @@ tbody tr:hover td { background: var(--row-hover); }
 
 @media (max-width: 1200px) {
   .metric-grid, .quality-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lead-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .insight-grid { grid-template-columns: 1fr; }
   .referral-grid { grid-template-columns: 1fr; }
   .referral-domains-card { min-height: 300px; }

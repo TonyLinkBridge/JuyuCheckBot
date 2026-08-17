@@ -1,13 +1,15 @@
 # 🔍 JUYU 域名体检
 
-`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。它不是客服菜单：用户发送域名后立即获得资料 Preview，选择使用意图，订阅 **JUYU 聚域｜域名情报局** 后解锁完整报告，再通过可追踪分享和按意图变化的商业深链形成增长闭环。
+`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。用户发送域名后先获得可信 Preview，订阅 **JUYU 聚域｜域名情报局** 后解锁进阶摘要；普通查询进入聚查完成注册、充值与查询消费，明确买卖需求进入 `@JuyuDomainBot`。
 
 正式 Bot 用户名：`@JuyuCheckBot`。
 
 ## 用户流程
 
 ```text
-新用户 → 发送域名 → Evidence Preview → 选择意图 → 订阅频道 → 完整报告
+新用户 → 发送域名 → Evidence Preview → 选择意图 → 订阅频道 → 进阶摘要
+                                                           ├─ 普通查询 → 聚查
+                                                           └─ 买卖需求 → 聚域助手
                     注册 / DNS / 来源   拥有 / 购买 / 研究       ├→ 分享 → 新用户
                                                           └→ 动态 CTA → Lead
 ```
@@ -19,9 +21,9 @@
 - `JUYU-EVIDENCE-3.1` 决策型证据报告：先说明结论、依据、注意事项与 JUYU 下一步，原始 DNS 和来源资料按需展开，不提供自创总分
 - 免费第三方事实层：Tranco 全球排名、Internet Archive 网站历史，以及配置免费 Key 后的 Chrome UX Report 与 Ahrefs Domain Rating
 - ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
-- Preview → 意图 → Growth Gate → `结论 / 依据 / 注意事项 / JUYU 建议` 决策报告
+- Preview → 意图 → Growth Gate → `结论 / 关键依据 / 注意事项 / JUYU 建议` 进阶摘要
 - Value-first 首屏与 Preview：订阅前先显示注册、DNS、Tranco / Ahrefs / CrUX 公开信号、资料覆盖与快速结论，再询问用户目的
-- `getChatMember` 频道订阅验证和完整报告 Growth Gate
+- `getChatMember` 频道订阅验证和进阶摘要 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
 - Supabase REST 后端持久保存并按用户安全读回报告，支持 Vercel 跨实例解锁
@@ -30,6 +32,7 @@
 - Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
 - 决策型分享卡：公开分享关键结论、Tranco / Ahrefs / CrUX 可信信号和资料覆盖，不公开用户买卖意图，并把朋友导回免费体检入口
 - Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
+- Jucha Conversion Loop：聚查按钮经 `/go/jucha` 记录真实点击，再携带域名与 UTM 参数进入聚查综合查询
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - 对 RDAP、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
@@ -67,6 +70,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    CHANNEL_URL=https://t.me/juyuofficial
    CHANNEL_NAME=JUYU 聚域｜域名情报局
    COMMERCE_BOT_USERNAME=JuyuDomainBot
+   JUCHA_URL=https://www.jucha.com/juhe/
    WEBHOOK_URL=https://你的稳定正式域名
    WEBHOOK_SECRET=至少16位、只含 A-Z a-z 0-9 _ - 的随机字符串
    CHECK_TIMEOUT_MS=8000

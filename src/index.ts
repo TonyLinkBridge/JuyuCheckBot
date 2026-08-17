@@ -1,14 +1,18 @@
 import express, { type ErrorRequestHandler } from "express";
 import { webhookCallback } from "grammy";
+import { createBackend } from "./backend.js";
 import { createBot } from "./bot.js";
 import { loadConfig } from "./config.js";
 import { REPORT_VERSION } from "./domain/evidence.js";
+import type { DomainIntent } from "./domain/types.js";
+import { juchaDomainLink } from "./messages.js";
 import { landingHtml, privacyHtml } from "./privacy.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
 
 const config = loadConfig();
 const bot = createBot(config);
+const backend = createBackend(config);
 const app = express();
 const telegramWebhook = webhookCallback(bot, "express");
 
@@ -19,11 +23,41 @@ app.get("/", (_request, response) => {
 app.get("/privacy", (_request, response) => {
   response.type("html").send(privacyHtml("JUYU 域名体检"));
 });
+app.get("/go/jucha", async (request, response) => {
+  const reportToken = typeof request.query.report === "string" && /^[A-Za-z0-9_-]+$/.test(request.query.report)
+    ? request.query.report
+    : "";
+  const requestedIntent = request.query.intent;
+  const intent: DomainIntent = requestedIntent === "owner" || requestedIntent === "buyer" ? requestedIntent : "research";
+  let domain = "";
+
+  if (reportToken) {
+    try {
+      const stored = await backend.getReferralReport(reportToken);
+      if (stored) {
+        domain = stored.report.domain;
+        await backend.track({
+          eventName: "jucha_handoff",
+          telegramUserId: stored.telegramUserId,
+          source: stored.source,
+          domain,
+          reportToken,
+          intent,
+          metadata: { target: "jucha", destination: "integrated_query" },
+        });
+      }
+    } catch (error) {
+      console.error("Unable to track Jucha handoff", error instanceof Error ? error.message : "unknown error");
+    }
+  }
+
+  response.redirect(302, juchaDomainLink(config.JUCHA_URL, domain, intent));
+});
 app.get("/health", (_request, response) => {
   response.status(200).json({
     ok: true,
     service: "juyu-domain-check",
-    version: "0.13.0",
+    version: "0.14.0",
     reportVersion: REPORT_VERSION,
     externalData: {
       tranco: "enabled",

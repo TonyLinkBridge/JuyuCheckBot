@@ -28,8 +28,7 @@ import {
   referralWelcomeText,
   shareCardKeyboard,
   shareCardText,
-  technicalReportKeyboard,
-  technicalReportText,
+  juchaHandoffLink,
   verificationUnavailableText,
   welcomeKeyboard,
   welcomeText,
@@ -266,19 +265,20 @@ export function createBot(config: Config): Bot {
       await ctx.answerCallbackQuery({ text: "报告不存在或已过期。", show_alert: true });
       return;
     }
-    await ctx.answerCallbackQuery({ text: "已打开技术资料" });
+    const link = juchaHandoffLink(config, stored.report.domain, intent, token);
+    await ctx.answerCallbackQuery({ text: "完整技术资料已移至聚查" });
     await Promise.all([
       backend.track({
-        eventName: "technical_details_viewed",
+        eventName: "jucha_handoff",
         telegramUserId: ctx.from.id,
         source: stored.source,
         domain: stored.report.domain,
         reportToken: token,
         intent,
       }),
-      ctx.reply(technicalReportText(stored.report), {
+      ctx.reply("🔎 <b>完整技术资料请到聚查继续查询</b>\n\n可继续查看网站历史、历史 WHOIS、备案、黑名单、平台风险、SEO 与历史价格。", {
         ...html,
-        reply_markup: technicalReportKeyboard(token),
+        reply_markup: new InlineKeyboard().url("🔓 打开聚查完整查询", link),
       }),
     ]);
   });

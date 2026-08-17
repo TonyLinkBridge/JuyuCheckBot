@@ -1,6 +1,6 @@
 import "server-only";
 
-const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-2.1";
+const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.1";
 
 export const rangeOptions = [
   { value: "1d", label: "24H", days: 1 },
@@ -91,6 +91,8 @@ export type DashboardData = {
     ownerUsers: number;
     handoffUsers: number;
     handoffRate: number;
+    juchaUsers: number;
+    juchaHandoffRate: number;
     submittedUsers: number;
     submittedLeads: number;
     completionRate: number;
@@ -482,6 +484,8 @@ function buildLeads(
   const buyerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "buyer").map((event) => event.telegram_user_id));
   const ownerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "owner").map((event) => event.telegram_user_id));
   const handoffUsers = new Set(handoffEvents.map((event) => event.telegram_user_id));
+  const unlockedUsers = new Set(events.filter((event) => event.event_name === "report_unlocked").map((event) => event.telegram_user_id));
+  const juchaUsers = new Set(events.filter((event) => event.event_name === "jucha_handoff").map((event) => event.telegram_user_id));
   const checkBotLeads = commerceLeads.filter((lead) => {
     const source = stringData(lead.data, "source");
     const handoffSource = stringData(lead.data, "handoff_source");
@@ -579,6 +583,8 @@ function buildLeads(
     ownerUsers: ownerUsers.size,
     handoffUsers: handoffUsers.size,
     handoffRate: ratio(handoffUsers.size, intentUsers.size),
+    juchaUsers: juchaUsers.size,
+    juchaHandoffRate: ratio(juchaUsers.size, unlockedUsers.size),
     submittedUsers: submittedUsers.size,
     submittedLeads: checkBotLeads.length,
     completionRate: ratio(completedHandoffUsers.size, handoffUsers.size),
@@ -786,6 +792,8 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       ownerUsers: 0,
       handoffUsers: 0,
       handoffRate: 0,
+      juchaUsers: 0,
+      juchaHandoffRate: 0,
       submittedUsers: 0,
       submittedLeads: 0,
       completionRate: 0,

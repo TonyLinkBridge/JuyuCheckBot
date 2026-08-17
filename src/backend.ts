@@ -18,6 +18,7 @@ export type GrowthEventName =
   | "share_generated"
   | "referral_opened"
   | "commerce_handoff"
+  | "jucha_handoff"
   | "history_viewed"
   | "refresh_requested"
   | "technical_details_viewed";
