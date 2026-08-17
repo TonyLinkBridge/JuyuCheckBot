@@ -11,24 +11,53 @@ import {
 } from "../src/messages.js";
 
 const report = {
+  reportVersion: "JUYU-EVIDENCE-2.0",
   domain: "example.com",
-  score: 86,
-  grade: "A",
-  scoreVersion: "JUYU-1.3",
-  evidenceGrade: "B",
-  marketEvidence: "limited",
-  provisional: false,
-  confidence: "medium",
-  dataCoverage: 90,
-  riskLevel: "low",
-  verdict: "简短、清晰，并具备品牌延展能力。",
-  strengths: ["简短易记", ".COM 品牌资产", "适合全球化品牌"],
-  dimensions: {
-    brandability: { score: 92 },
-    memorability: { score: 90 },
-    commercialPotential: { score: 88 },
+  registrableDomain: "example.com",
+  isSubdomain: false,
+  isIdn: false,
+  checkedAt: new Date("2026-08-17T00:00:00Z"),
+  dataCoverage: 100,
+  ageYears: 26,
+  daysToExpiry: 1200,
+  evidenceItems: [
+    { key: "registration", label: "注册状态", available: true },
+    { key: "registrar", label: "注册商", available: true },
+    { key: "created", label: "注册日期", available: true },
+    { key: "expiry", label: "到期日期", available: true },
+    { key: "nameservers", label: "Nameserver", available: true },
+    { key: "dns", label: "DNS", available: true },
+    { key: "dnssec", label: "DNSSEC", available: true },
+  ],
+  structure: {
+    nameLength: 7,
+    suffix: "com",
+    hyphenCount: 0,
+    digitCount: 0,
+    characterType: "ascii-letters",
   },
-  rdap: { status: "registered" },
+  summary: "已确认注册资料与 DNS；本次基础检查未发现明显警报。",
+  alerts: [],
+  observations: ["主体长度：7 个字符", "连字符：无", "数字：无", "字符类型：英文字母", "后缀：.com"],
+  dns: {
+    checked: true,
+    resolves: true,
+    ipv4: ["192.0.2.1"],
+    ipv6: [],
+    nameServers: ["ns1.example.com"],
+    mx: [],
+  },
+  rdap: {
+    status: "registered",
+    registrar: "Example Registrar",
+    createdAt: new Date("2000-01-01T00:00:00Z"),
+    expiresAt: new Date("2030-01-01T00:00:00Z"),
+    updatedAt: null,
+    nameServers: ["ns1.example.com"],
+    statuses: ["active"],
+    dnssec: false,
+    source: { type: "rdap", name: "RDAP 注册资料", url: "https://rdap.org/domain/example.com" },
+  },
 } as DomainReport;
 
 describe("referral growth messages", () => {
@@ -38,10 +67,10 @@ describe("referral growth messages", () => {
     const keyboard = shareCardKeyboard(config, report, "token_123");
     const shareUrl = keyboard.inline_keyboard[0]?.[0]?.url;
 
-    expect(text).toContain("86 / 100");
-    expect(text).toContain("JUYU Structure Score");
-    expect(text).toContain("证据等级　B");
-    expect(text).toContain("✓ 简短易记");
+    expect(text).toContain("资料取得");
+    expect(text).toContain("7/7 项");
+    expect(text).toContain("RDAP 注册资料");
+    expect(text).not.toContain("/ 100");
     expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
     expect(shareUrl).not.toContain("telegram_user_id");
   });
@@ -55,11 +84,20 @@ describe("referral growth messages", () => {
     expect(keyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("start_check");
   });
 
-  it("labels low-evidence results as provisional instead of presenting false precision", () => {
-    const text = shareCardText({ ...report, evidenceGrade: "D", provisional: true, dataCoverage: 25 });
+  it("states when registration data cannot be confirmed instead of claiming availability", () => {
+    const text = shareCardText({
+      ...report,
+      summary: "DNS 正常，但当前资料源无法确认注册记录；不能据此判断可注册。",
+      alerts: ["注册状态暂时无法从可用资料源确认"],
+      rdap: {
+        ...report.rdap,
+        status: "unknown",
+        source: { type: "unavailable", name: "暂未取得注册资料", url: null },
+      },
+    });
 
-    expect(text).toContain("暂定结构分");
-    expect(text).toContain("证据等级　D");
+    expect(text).toContain("暂时无法确认");
+    expect(text).toContain("不能据此判断可注册");
   });
 });
 

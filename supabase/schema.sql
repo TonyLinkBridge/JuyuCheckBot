@@ -8,6 +8,8 @@ create table if not exists public.domain_reports (
   source text not null default 'direct',
   domain text not null,
   intent text check (intent is null or intent in ('owner', 'buyer', 'research')),
+  -- The following legacy score columns remain only for backward compatibility.
+  -- JUYU-EVIDENCE-2.0 does not expose or calculate a proprietary domain score.
   score smallint not null check (score between 0 and 100),
   grade text not null check (grade in ('S', 'A', 'B', 'C', 'D')),
   score_version text not null,

@@ -1,5 +1,13 @@
 export type RegistrationStatus = "registered" | "available" | "unknown";
 
+export type RegistrationSourceType = "rdap" | "registry-whois" | "unavailable";
+
+export type RegistrationSource = {
+  type: RegistrationSourceType;
+  name: string;
+  url: string | null;
+};
+
 export type RdapResult = {
   status: RegistrationStatus;
   registrar: string | null;
@@ -9,6 +17,7 @@ export type RdapResult = {
   nameServers: string[];
   statuses: string[];
   dnssec: boolean | null;
+  source: RegistrationSource;
 };
 
 export type DnsResult = {
@@ -20,31 +29,23 @@ export type DnsResult = {
   mx: Array<{ exchange: string; priority: number }>;
 };
 
-export type RiskLevel = "low" | "medium" | "high" | "unknown";
-
 export type DomainIntent = "owner" | "buyer" | "research";
-export type ScoreGrade = "S" | "A" | "B" | "C" | "D";
-export type ScoreConfidence = "low" | "medium";
-export type EvidenceGrade = "A" | "B" | "C" | "D";
-export type MarketEvidence = "limited";
-export type ScoreDimensionKey =
-  | "brandability"
-  | "memorability"
-  | "commercialPotential"
-  | "extensionFit"
-  | "globalReach"
-  | "marketSignals";
-
-export type ScoreDimension = {
-  key: ScoreDimensionKey;
+export type EvidenceItem = {
+  key: "registration" | "registrar" | "created" | "expiry" | "nameservers" | "dns" | "dnssec";
   label: string;
-  score: number;
-  weight: number;
   available: boolean;
-  conclusion: string;
+};
+
+export type StructureFacts = {
+  nameLength: number;
+  suffix: string;
+  hyphenCount: number;
+  digitCount: number;
+  characterType: "ascii-letters" | "ascii-mixed" | "idn";
 };
 
 export type DomainReport = {
+  reportVersion: string;
   domain: string;
   registrableDomain: string;
   isSubdomain: boolean;
@@ -54,18 +55,10 @@ export type DomainReport = {
   dns: DnsResult;
   ageYears: number | null;
   daysToExpiry: number | null;
-  score: number;
-  grade: ScoreGrade;
-  scoreVersion: string;
-  confidence: ScoreConfidence;
-  evidenceGrade: EvidenceGrade;
-  marketEvidence: MarketEvidence;
-  provisional: boolean;
   dataCoverage: number;
-  dimensions: Record<ScoreDimensionKey, ScoreDimension>;
-  verdict: string;
-  riskLevel: RiskLevel;
-  riskFlags: string[];
-  strengths: string[];
-  structureNotes: string[];
+  evidenceItems: EvidenceItem[];
+  structure: StructureFacts;
+  summary: string;
+  alerts: string[];
+  observations: string[];
 };

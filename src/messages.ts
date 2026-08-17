@@ -2,7 +2,7 @@ import { InlineKeyboard } from "grammy";
 import type { StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
 import { encodeDomainParam } from "./domain/normalize.js";
-import type { DomainIntent, DomainReport, RegistrationStatus, RiskLevel } from "./domain/types.js";
+import type { DomainIntent, DomainReport, RegistrationStatus } from "./domain/types.js";
 
 export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
@@ -27,7 +27,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会显示 JUYU Structure Score、证据等级、品牌力、记忆度、商业适配和独立风险。选择你的目的后，订阅 JUYU 情报局即可解锁完整 DATA、JUYU ANALYSIS 与行动建议。
+免费 Preview 会显示注册状态、DNS、资料来源、数据完整度和基础警报。选择你的目的后，订阅 JUYU 情报局即可解锁完整可验证资料、名称结构事实与行动建议。
 
 常用命令：
 /recent 最近体检
@@ -40,24 +40,21 @@ export function checkingText(domain: string): string {
 }
 
 export function previewReportText(report: DomainReport): string {
-  const { brandability, memorability, commercialPotential } = report.dimensions;
   return `✅ <b>JUYU DOMAIN CHECK</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
-
-品牌力　　　 ${barScore(brandability.score)} ${brandability.score}
-商业适配　　 ${barScore(commercialPotential.score)} ${commercialPotential.score}
-记忆度　　　 ${barScore(memorability.score)} ${memorability.score}
-风险等级　　 ${riskLabel(report.riskLevel)}
+注册资料　${registrationStatusLine(report.rdap.status)}
+DNS　　　${dnsStatusLine(report)}
+资料取得　<b>${evidenceCount(report)}</b>
+基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
+资料来源　${registrationSource(report)}
 
 ━━━━━━━━━━━━━━
-<b>一句话判断</b>
-${escapeHtml(report.verdict)}
+<b>检查结论</b>
+${escapeHtml(report.summary)}
 
-<i>${trustLine(report)}
-结构评分不等于估值或成交概率。</i>`;
+<i>这里只显示可验证资料与明确规则，不提供自创域名评分或估值。</i>`;
 }
 
 export const intentPromptText = `为了给你更准确的行动建议：
@@ -76,10 +73,10 @@ export function gateText(config: Config): string {
   return `🔒 <b>解锁完整 JUYU 域名体检</b>
 
 完整报告包含：
-✓ DATA｜注册、域龄与 DNS
-✓ 五维 JUYU Structure Score
-✓ 证据等级与基础活跃度参考
-✓ 核心优势与主要风险
+✓ 注册状态、注册商、域龄与到期日
+✓ RDAP / 对应注册局资料来源
+✓ DNS、Nameserver、MX 与 DNSSEC
+✓ 名称结构事实与基础警报
 ✓ 根据你的目的生成行动建议
 
 免费订阅
@@ -99,24 +96,19 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
   const age = report.ageYears === null ? "未知" : `${formatYears(report.ageYears)} 年`;
   const dnssec = report.rdap.dnssec === null ? "未知" : report.rdap.dnssec ? "已启用" : "未启用";
   const nsCount = new Set([...report.rdap.nameServers, ...report.dns.nameServers]).size;
-  const dimensionLines = Object.values(report.dimensions)
-    .map(
-      (item) =>
-        `• ${item.label}（${item.weight === 0 ? "参考项" : `${Math.round(item.weight * 100)}%`}）：<b>${item.available === false ? "N/A" : item.score}</b>｜${escapeHtml(item.conclusion)}`,
-    )
-    .join("\n");
-  const strengths = report.strengths.length
-    ? report.strengths.slice(0, 3).map((item, index) => `${padIndex(index)} ${escapeHtml(item)}`).join("\n")
-    : "01 暂无明显加分项";
-  const risks = report.riskFlags.slice(0, 3).map((item, index) => `${padIndex(index)} ${escapeHtml(item)}`).join("\n");
+  const evidenceLines = report.evidenceItems
+    .map((item) => `${item.available ? "✓" : "○"} ${escapeHtml(item.label)}`)
+    .join("　");
+  const structureLines = report.observations.map((item) => `• ${escapeHtml(item)}`).join("\n");
+  const alerts = report.alerts.length
+    ? report.alerts.map((item, index) => `${padIndex(index)} ${escapeHtml(item)}`).join("\n")
+    : "本次基础检查未发现明显警报";
 
   return `🔓 <b>完整 JUYU 域名体检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
-证据等级：<b>${evidenceGrade(report)}</b>
-市场证据：<b>LIMITED</b>｜尚未接入真实成交数据库
-风险等级：${riskLabel(report.riskLevel)}
+资料取得：<b>${evidenceCount(report)}</b>
+资料来源：${registrationSource(report)}
 
 ━━━━━━━━━━━━━━
 📋 <b>DATA｜可验证数据</b>
@@ -130,26 +122,26 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
 • MX：${report.dns.mx.length ? `${report.dns.mx.length} 条` : "未发现"}
 • DNSSEC：${dnssec}
 
+<b>已取得项目</b>
+${evidenceLines}
+
 ━━━━━━━━━━━━━━
-🧠 <b>JUYU ANALYSIS｜规则判断</b>
-${dimensionLines}
+🔎 <b>STRUCTURE｜名称结构事实</b>
+${structureLines}
 
-<b>一句话判断</b>
-${escapeHtml(report.verdict)}
+<b>基础警报</b>
+${alerts}
 
-<b>核心优势</b>
-${strengths}
-
-<b>主要风险</b>
-${risks}
+<b>检查结论</b>
+${escapeHtml(report.summary)}
 
 ━━━━━━━━━━━━━━
 🎯 <b>ACTION｜建议行动</b>
 ${escapeHtml(actionAdvice(report, intent))}
 
-<i>${trustLine(report)}
+<i>${escapeHtml(report.reportVersion)} · 数据取得 ${evidenceCount(report)}
 体检时间：${formatDateTime(report.checkedAt)}
-结构评分只判断名称与后缀条件；基础活跃度独立参考。市场证据尚未包含成交数据库。本报告不构成估值、商标、法律、安全或交易意见。</i>`;
+本报告不提供自创评分，也不构成估值、商标、法律、安全或交易意见。注册可用性以对应注册服务的实时结果为准。</i>`;
 }
 
 export function fullReportKeyboard(
@@ -180,25 +172,17 @@ export function fullReportKeyboard(
 }
 
 export function shareCardText(report: DomainReport): string {
-  const { brandability, memorability, commercialPotential } = report.dimensions;
-  const highlights = report.strengths.length
-    ? report.strengths.slice(0, 3).map((item) => `✓ ${escapeHtml(item)}`).join("\n")
-    : "✓ 已完成品牌、结构与基础风险扫描";
   return `📤 <b>JUYU DOMAIN CHECK</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
+注册资料　${registrationStatusLine(report.rdap.status)}
+DNS　　　${dnsStatusLine(report)}
+资料取得　<b>${evidenceCount(report)}</b>
+基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
+来源　　　${registrationSource(report)}
 
-品牌力　　${brandability.score}
-记忆度　　${memorability.score}
-商业适配　${commercialPotential.score}
-风险等级　${riskLabel(report.riskLevel)}
-证据等级　${evidenceGrade(report)}
-
-<b>${escapeHtml(report.verdict)}</b>
-
-${highlights}
+<b>${escapeHtml(report.summary)}</b>
 
 👇 <b>你也可以免费查一个域名</b>
 
@@ -207,7 +191,7 @@ ${highlights}
 
 export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
   const reportLink = referralLink(config.BOT_USERNAME, token);
-  const shareText = `我刚用 JUYU 查了 ${report.domain} 的结构评分：${report.score}/100（${report.grade}级）。\n\n这不是估值，你觉得它能做成品牌吗？点开也能免费查你的域名 👇`;
+  const shareText = `我刚用 JUYU 查了 ${report.domain} 的注册资料、DNS 与基础警报。\n\n资料来源和缺失项目都会明确显示，你也可以免费查一个域名 👇`;
   return new InlineKeyboard()
     .url(
       "📤 分享这份体检",
@@ -218,19 +202,15 @@ export function shareCardKeyboard(config: Config, report: DomainReport, token: s
 }
 
 export function referralWelcomeText(report: DomainReport): string {
-  const { brandability, memorability, commercialPotential } = report.dimensions;
   return `👋 <b>朋友分享了一份 JUYU 域名体检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
-<b>${scoreLabel(report)}：${report.score} / 100　${report.grade}级</b>
+注册资料　${registrationStatusLine(report.rdap.status)}
+DNS　　　${dnsStatusLine(report)}
+资料取得　<b>${evidenceCount(report)}</b>
+基础警报　${report.alerts.length ? `⚠️ ${report.alerts.length} 项` : "✅ 本次未发现"}
 
-品牌力　　 ${brandability.score}
-记忆度　　 ${memorability.score}
-商业适配　 ${commercialPotential.score}
-风险等级　 ${riskLabel(report.riskLevel)}
-证据等级　 ${evidenceGrade(report)}
-
-<b>${escapeHtml(report.verdict)}</b>
+<b>${escapeHtml(report.summary)}</b>
 
 ━━━━━━━━━━━━━━
 🔍 <b>现在体检你的域名</b>
@@ -238,7 +218,7 @@ export function referralWelcomeText(report: DomainReport): string {
 直接发送一个域名，例如：
 <code>yourdomain.com</code>
 
-先免费查看域名结构评分、证据等级与基础风险。`;
+先免费查看注册资料、DNS、资料来源与基础警报。`;
 }
 
 export function referralWelcomeKeyboard(): InlineKeyboard {
@@ -253,7 +233,7 @@ export function recentReportsText(reports: StoredReport[]): string {
 export function recentReportsKeyboard(reports: StoredReport[]): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   for (const item of reports) {
-    keyboard.text(`${item.report.domain} · ${item.report.score}/${item.report.grade}`, `history:${item.reportToken}`).row();
+    keyboard.text(`${item.report.domain} · ${registrationShortLabel(item.report.rdap.status)}`, `history:${item.reportToken}`).row();
   }
   return keyboard.text("🔎 新体检", "start_check");
 }
@@ -309,12 +289,11 @@ export function commerceLink(botUsername: string, action: string, domain: string
 }
 
 function actionAdvice(report: DomainReport, intent: DomainIntent): string {
-  if (report.provisional) {
-    return "VERIFY：当前证据等级较低，请先补做注册状态、历史、商标与市场核查，再决定购买、出售或开发。";
+  if (report.rdap.status === "unknown") {
+    return "VERIFY：当前资料源无法确认注册状态，请先到对应注册服务复核，再决定购买、出售或开发。";
   }
   if (intent === "owner") {
-    if (report.score >= 80) return "HOLD / BUILD：保留并完善品牌使用，同时补做商标、历史与成交对标。";
-    return "REVIEW：先确认实际使用场景，再决定继续持有、开发或提交出售评估。";
+    return "REVIEW：核对注册资料与实际使用情况，再决定继续持有、开发或提交出售评估。";
   }
   if (intent === "buyer") {
     if (report.rdap.status === "available") return "REGISTER：先核实注册可用性与商标风险，再完成注册。";
@@ -329,39 +308,32 @@ function registrationLabel(status: RegistrationStatus): string {
   return "暂时无法确认";
 }
 
-function riskLabel(level: RiskLevel): string {
-  if (level === "low") return "🟢 LOW";
-  if (level === "medium") return "🟡 MEDIUM";
-  if (level === "high") return "🔴 HIGH";
-  return "⚪️ UNKNOWN";
+function evidenceCount(report: DomainReport): string {
+  return `${report.evidenceItems.filter((item) => item.available).length}/${report.evidenceItems.length} 项`;
 }
 
-function confidenceLabel(confidence: DomainReport["confidence"]): string {
-  return confidence === "medium" ? "中" : "低";
+function registrationStatusLine(status: RegistrationStatus): string {
+  if (status === "registered") return "✅ 已确认注册";
+  if (status === "available") return "○ 资料源未发现记录";
+  return "⚠️ 暂时无法确认";
 }
 
-function scoreLabel(report: DomainReport): string {
-  if (report.scoreVersion !== "JUYU-1.3") return "JUYU Score（旧版）";
-  return report.provisional ? "暂定结构分" : "JUYU Structure Score";
+function registrationShortLabel(status: RegistrationStatus): string {
+  if (status === "registered") return "已注册";
+  if (status === "available") return "未发现记录";
+  return "待确认";
 }
 
-function evidenceGrade(report: DomainReport): DomainReport["evidenceGrade"] {
-  if (report.evidenceGrade) return report.evidenceGrade;
-  if (report.dataCoverage >= 75) return "B";
-  if (report.dataCoverage >= 60) return "C";
-  return "D";
+function dnsStatusLine(report: DomainReport): string {
+  if (!report.dns.checked) return "⚠️ 本次未取得";
+  return report.dns.resolves ? "✅ 解析正常" : "○ 未发现解析";
 }
 
-function trustLine(report: DomainReport): string {
-  if (report.scoreVersion !== "JUYU-1.3") {
-    return `${report.scoreVersion || "旧版"} · 旧版综合分 · 重新体检可获得新版结构评分`;
-  }
-  return `${report.scoreVersion} · 证据等级 ${evidenceGrade(report)} · 置信度 ${confidenceLabel(report.confidence)} · 数据覆盖 ${report.dataCoverage}% · 市场证据 LIMITED`;
-}
-
-function barScore(score: number): string {
-  const filled = Math.max(0, Math.min(5, Math.round(score / 20)));
-  return `${"●".repeat(filled)}${"○".repeat(5 - filled)}`;
+function registrationSource(report: DomainReport): string {
+  const name = escapeHtml(report.rdap.source.name);
+  return report.rdap.source.url
+    ? `<a href="${escapeHtml(report.rdap.source.url)}">${name}</a>`
+    : name;
 }
 
 function padIndex(index: number): string {

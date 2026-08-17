@@ -1,12 +1,12 @@
 import { checkDnsWithRetry, emptyDnsResult } from "./dns.js";
 import type { DomainReport } from "./types.js";
 import type { NormalizedDomain } from "./normalize.js";
-import { checkRdapWithRetry, unknownRdap } from "./rdap.js";
-import { scoreDomain } from "./score.js";
+import { checkRegistrationWithRetry, unknownRdap } from "./rdap.js";
+import { buildEvidence } from "./evidence.js";
 
 export async function checkDomain(input: NormalizedDomain, timeoutMs: number): Promise<DomainReport> {
   const [rdapResult, dnsResult] = await Promise.allSettled([
-    checkRdapWithRetry(input.registrableDomain, timeoutMs),
+    checkRegistrationWithRetry(input.registrableDomain, input.publicSuffix, input.isPrivateSuffix, timeoutMs),
     checkDnsWithRetry(input.ascii, timeoutMs),
   ]);
 
@@ -15,7 +15,7 @@ export async function checkDomain(input: NormalizedDomain, timeoutMs: number): P
     dnsResult.status === "fulfilled"
       ? dnsResult.value
       : emptyDnsResult();
-  const scored = scoreDomain({
+  const evidence = buildEvidence({
     domain: input.ascii,
     registrableDomain: input.registrableDomain,
     isIdn: input.isIdn,
@@ -31,6 +31,6 @@ export async function checkDomain(input: NormalizedDomain, timeoutMs: number): P
     checkedAt: new Date(),
     rdap,
     dns,
-    ...scored,
+    ...evidence,
   };
 }

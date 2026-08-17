@@ -1,14 +1,14 @@
 # 🔍 JUYU 域名体检
 
-`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。它不是客服菜单：用户发送域名后立即获得 Score Preview，选择使用意图，订阅 **JUYU 聚域｜域名情报局** 后解锁完整报告，再通过可追踪分享和按意图变化的商业深链形成增长闭环。
+`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。它不是客服菜单：用户发送域名后立即获得资料 Preview，选择使用意图，订阅 **JUYU 聚域｜域名情报局** 后解锁完整报告，再通过可追踪分享和按意图变化的商业深链形成增长闭环。
 
 正式 Bot 用户名：`@JuyuCheckBot`。
 
 ## 用户流程
 
 ```text
-新用户 → 发送域名 → Score Preview → 选择意图 → 订阅频道 → 完整报告
-                    总分 / 等级       拥有 / 购买 / 研究       ├→ 分享 → 新用户
+新用户 → 发送域名 → Evidence Preview → 选择意图 → 订阅频道 → 完整报告
+                    注册 / DNS / 来源   拥有 / 购买 / 研究       ├→ 分享 → 新用户
                                                           └→ 动态 CTA → Lead
 ```
 
@@ -16,7 +16,8 @@
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
 - 免费 RDAP 注册信息与原生 DNS 检查，不使用演示数据
-- 版本化 `JUYU-1.3` 五维结构评分、证据等级、独立风险、数据覆盖和基础活跃度参考
+- `JUYU-EVIDENCE-2.0` 证据型报告：注册资料、DNS、来源、取得项目与基础警报，不提供自创总分
+- ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
 - Preview → 意图 → Growth Gate → `DATA / JUYU ANALYSIS / ACTION` 报告
 - `getChatMember` 频道订阅验证和完整报告 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
@@ -28,7 +29,7 @@
 - Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
-- `JUYU-1.3` 对 RDAP / DNS 临时失败执行重试；证据不足时标记暂定分，基础活跃度与风险不参与结构总分
+- 对 RDAP、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
 - 推荐打开按独立用户计数，最近报告按域名去重
 - 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与数据健康监控
 - Dashboard Poll 引流发布器：测试/正式频道双目标、服务器端 Token、正式发布确认与 `src_` Campaign 自动归因
@@ -146,9 +147,9 @@ npm run dashboard:dev
 
 连字符会编码为双连字符，例如 `my-domain.com` → `my--domain-com`。Commerce Bot 应复用 `encodeDomainParam` / `decodeDomainParam` 的规则，避免域名解析歧义。
 
-## Domain Score 边界
+## Evidence Report 边界
 
-`JUYU-1.3` 的总分只包含品牌力、记忆度、商业适配、后缀匹配与全球化能力。基础活跃度独立显示且不参与结构总分，注册与 DNS 风险也不再直接改变结构质量。证据等级最高暂为 B；在接入可验证成交数据前不会给 A。覆盖不足的报告标记为暂定分。当前仍是透明的初筛启发式规则，不是域名估值，也不代表商标可用性、历史内容安全、SEO 信誉、市场需求或交易合法性。
+`JUYU-EVIDENCE-2.0` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。报告只显示取得的注册资料、DNS 结果、明确来源、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
 
 ## Supabase 后端
 

@@ -31,6 +31,15 @@ describe("normalizeDomain", () => {
     });
   });
 
+  it("recognizes eu.cc as a private registry suffix", () => {
+    expect(normalizeDomain("euhome.eu.cc")).toMatchObject({
+      registrableDomain: "euhome.eu.cc",
+      publicSuffix: "eu.cc",
+      isPrivateSuffix: true,
+      subdomain: null,
+    });
+  });
+
   it("rejects email addresses and malformed labels", () => {
     expect(() => normalizeDomain("hello@example.com")).toThrow(DomainInputError);
     expect(() => normalizeDomain("-bad.com")).toThrow(DomainInputError);

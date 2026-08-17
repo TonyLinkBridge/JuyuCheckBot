@@ -1,4 +1,5 @@
 import type { Config } from "./config.js";
+import { buildEvidence } from "./domain/evidence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 
 export type GrowthEventName =
@@ -54,7 +55,7 @@ export interface Backend {
   getReport(reportToken: string, telegramUserId: number): Promise<StoredReport | null>;
   getReferralReport(reportToken: string): Promise<StoredReport | null>;
   hasReferralOpen(telegramUserId: number, reportToken: string): Promise<boolean>;
-  getRecentReport(domain: string, scoreVersion: string, maxAgeMs: number): Promise<DomainReport | null>;
+  getRecentReport(domain: string, reportVersion: string, maxAgeMs: number): Promise<DomainReport | null>;
   listReports(telegramUserId: number, limit: number): Promise<StoredReport[]>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
   cleanupExpiredData(retentionDays: number): Promise<void>;
@@ -226,12 +227,14 @@ class SupabaseBackend implements Backend {
         source: record.source,
         domain: record.report.domain,
         intent: record.intent ?? null,
-        score: record.report.score,
-        grade: record.report.grade,
-        score_version: record.report.scoreVersion,
-        confidence: record.report.confidence,
+        // Legacy columns remain populated for compatibility with the existing Supabase schema.
+        // They are no longer exposed as a JUYU domain score.
+        score: 0,
+        grade: "D",
+        score_version: record.report.reportVersion,
+        confidence: record.report.dataCoverage === 100 ? "medium" : "low",
         data_coverage: record.report.dataCoverage,
-        dimension_scores: record.report.dimensions,
+        dimension_scores: {},
         report: record.report,
       },
       "resolution=merge-duplicates,return=minimal",
@@ -269,10 +272,10 @@ class SupabaseBackend implements Backend {
     return Boolean(rows?.length);
   }
 
-  async getRecentReport(domain: string, scoreVersion: string, maxAgeMs: number): Promise<DomainReport | null> {
+  async getRecentReport(domain: string, reportVersion: string, maxAgeMs: number): Promise<DomainReport | null> {
     const query = new URLSearchParams({
       domain: `eq.${domain}`,
-      score_version: `eq.${scoreVersion}`,
+      score_version: `eq.${reportVersion}`,
       created_at: `gte.${new Date(Date.now() - maxAgeMs).toISOString()}`,
       select: "report",
       order: "created_at.desc",
@@ -403,32 +406,56 @@ function reviveDomainReport(value: unknown): DomainReport | null {
   const checkedAt = reviveDate(value.checkedAt);
   if (!checkedAt) return null;
 
-  const rdap = value.rdap;
-  const dataCoverage = typeof value.dataCoverage === "number" ? value.dataCoverage : 0;
-  const evidenceGrade = isEvidenceGrade(value.evidenceGrade)
-    ? value.evidenceGrade
-    : dataCoverage >= 75
-      ? "B"
-      : dataCoverage >= 60
-        ? "C"
-        : "D";
-  return {
-    ...(value as unknown as DomainReport),
-    evidenceGrade,
-    marketEvidence: "limited",
-    provisional: typeof value.provisional === "boolean" ? value.provisional : evidenceGrade === "D",
-    checkedAt,
-    rdap: {
-      ...(rdap as unknown as DomainReport["rdap"]),
-      createdAt: reviveNullableDate(rdap.createdAt),
-      expiresAt: reviveNullableDate(rdap.expiresAt),
-      updatedAt: reviveNullableDate(rdap.updatedAt),
-    },
+  const rdapValue = value.rdap;
+  const rdap: DomainReport["rdap"] = {
+    status: rdapValue.status === "registered" || rdapValue.status === "available" ? rdapValue.status : "unknown",
+    registrar: typeof rdapValue.registrar === "string" ? rdapValue.registrar : null,
+    createdAt: reviveNullableDate(rdapValue.createdAt),
+    expiresAt: reviveNullableDate(rdapValue.expiresAt),
+    updatedAt: reviveNullableDate(rdapValue.updatedAt),
+    nameServers: stringArray(rdapValue.nameServers),
+    statuses: stringArray(rdapValue.statuses),
+    dnssec: typeof rdapValue.dnssec === "boolean" ? rdapValue.dnssec : null,
+    source: isRecord(rdapValue.source) && isRegistrationSourceType(rdapValue.source.type)
+      ? {
+          type: rdapValue.source.type,
+          name: typeof rdapValue.source.name === "string" ? rdapValue.source.name : "注册资料",
+          url: typeof rdapValue.source.url === "string" ? rdapValue.source.url : null,
+        }
+      : {
+          type: rdapValue.status === "registered" || rdapValue.status === "available" ? "rdap" : "unavailable",
+          name: rdapValue.status === "registered" || rdapValue.status === "available" ? "RDAP 注册资料" : "暂未取得注册资料",
+          url: null,
+        },
   };
-}
-
-function isEvidenceGrade(value: unknown): value is DomainReport["evidenceGrade"] {
-  return value === "A" || value === "B" || value === "C" || value === "D";
+  const dnsValue = isRecord(value.dns) ? value.dns : {};
+  const dns: DomainReport["dns"] = {
+    checked: dnsValue.checked === true,
+    resolves: dnsValue.resolves === true,
+    ipv4: stringArray(dnsValue.ipv4),
+    ipv6: stringArray(dnsValue.ipv6),
+    nameServers: stringArray(dnsValue.nameServers),
+    mx: Array.isArray(dnsValue.mx)
+      ? dnsValue.mx.filter(isRecord).map((item) => ({
+          exchange: typeof item.exchange === "string" ? item.exchange : "",
+          priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 0,
+        })).filter((item) => item.exchange)
+      : [],
+  };
+  const registrableDomain = typeof value.registrableDomain === "string" ? value.registrableDomain : value.domain;
+  const isIdn = value.isIdn === true;
+  const evidence = buildEvidence({ domain: value.domain, registrableDomain, isIdn, rdap, dns, now: checkedAt });
+  return {
+    domain: value.domain,
+    registrableDomain,
+    isSubdomain: value.isSubdomain === true,
+    isIdn,
+    checkedAt,
+    rdap,
+    dns,
+    ...evidence,
+    reportVersion: typeof value.reportVersion === "string" ? value.reportVersion : `${evidence.reportVersion} · legacy data`,
+  };
 }
 
 function reviveNullableDate(value: unknown): Date | null {
@@ -449,4 +476,12 @@ function isDomainIntent(value: unknown): value is DomainIntent {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function isRegistrationSourceType(value: unknown): value is DomainReport["rdap"]["source"]["type"] {
+  return value === "rdap" || value === "registry-whois" || value === "unavailable";
 }

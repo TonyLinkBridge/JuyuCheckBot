@@ -399,13 +399,13 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
           <CardHeader><div><p className="card-kicker">OPPORTUNITIES</p><h2>潜在客户列表 <small>Lead opportunities</small></h2></div>{leads.commerceConfigured && !leads.commerceError ? <Badge className="commerce-connected">COMMERCE CONNECTED</Badge> : <Briefcase size={18} className="muted-icon" aria-hidden="true" />}</CardHeader>
           <CardContent className="table-wrap">
             <table>
-              <thead><tr><th>优先级</th><th>域名</th><th>意图</th><th>操作</th><th>评分</th><th>来源</th><th>状态</th></tr></thead>
+              <thead><tr><th>优先级</th><th>域名</th><th>意图</th><th>操作</th><th>资料</th><th>来源</th><th>状态</th></tr></thead>
               <tbody>{leads.opportunities.length ? leads.opportunities.map((lead, index) => <tr key={`${lead.domain}-${lead.intent}-${index}`}>
                 <td><Badge className={`priority-${lead.priority}`}>{priorityLabel(lead.priority)}</Badge></td>
                 <td><span className="source-name">{lead.domain}</span></td>
                 <td>{lead.intent === "buyer" ? "想购买" : "想出售"}</td>
                 <td>{leadActionLabel(lead.action)}</td>
-                <td>{lead.score === null ? "—" : `${lead.score}${lead.grade ? ` · ${lead.grade}` : ""}`}</td>
+                <td>{lead.evidenceAvailable === null || lead.evidenceTotal === null ? registrationStatusLabel(lead.registrationStatus) : `${lead.evidenceAvailable}/${lead.evidenceTotal} · ${registrationStatusLabel(lead.registrationStatus)}`}</td>
                 <td><Badge>{lead.source}</Badge></td>
                 <td><span className={cn("lead-status", lead.handedOff && "handed-off", lead.submitted && "submitted")}><i />{lead.submitted ? leadStatusLabel(lead.leadStatus) : lead.handedOff ? "已进入助手" : "待行动"}</span></td>
               </tr>) : <tr><td colSpan={7} className="empty-cell">用户选择购买或出售意图后显示</td></tr>}</tbody>
@@ -427,10 +427,10 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
 
 function QualityGrid({ quality }: { quality: DashboardData["quality"] }) {
   const items = [
-    { label: "体检报告", value: String(quality.reportCount), hint: `Reports · JUYU-1.3 平均结构分 ${quality.averageScore.toFixed(1)}`, icon: Bot, tone: "neutral" },
+    { label: "体检报告", value: String(quality.reportCount), hint: "Evidence reports · 不含自创评分", icon: Bot, tone: "neutral" },
     { label: "响应中位数", value: quality.medianDurationMs ? `${(quality.medianDurationMs / 1000).toFixed(1)}s` : "—", hint: "Median latency · Preview", icon: Clock3, tone: quality.medianDurationMs > 6000 ? "warn" : "good" },
-    { label: "低置信报告", value: formatPercent(quality.lowConfidenceRate), hint: "Low confidence · 数据覆盖", icon: Gauge, tone: quality.lowConfidenceRate > 0.15 ? "warn" : "good" },
-    { label: "基础活跃度缺失", value: formatPercent(quality.unavailableRate), hint: "Reference only · 不参与结构分", icon: Database, tone: quality.unavailableRate > 0.1 ? "warn" : "good" },
+    { label: "注册状态确认", value: formatPercent(quality.registrationConfirmedRate), hint: "RDAP / Registry WHOIS", icon: Gauge, tone: quality.registrationConfirmedRate < 0.85 ? "warn" : "good" },
+    { label: "注册局回退", value: formatPercent(quality.registryFallbackRate), hint: "Private suffix fallback", icon: Database, tone: "neutral" },
     { label: "缓存命中", value: formatPercent(quality.cachedRate), hint: "Cache hit · 15 分钟复用", icon: RefreshCw, tone: "neutral" },
     { label: "体检失败", value: formatPercent(quality.failureRate), hint: "Check failures · 提交→失败", icon: quality.failureRate > 0 ? XCircle : CheckCircle2, tone: quality.failureRate > 0.05 ? "bad" : "good" },
   ];
@@ -461,9 +461,9 @@ function buildInsights(data: DashboardData) {
       : { label: "闭环 GROWTH LOOP", title: "等待第一次分享", body: "完整报告已经是价值交付点，建议继续强化报告底部的分享理由。", tone: "neutral", icon: Share2 };
   const healthInsight = data.quality.failureRate > 0.05
     ? { label: "质量 HEALTH", title: "体检失败率需要关注", body: `失败率为 ${formatPercent(data.quality.failureRate)}，优先检查外部数据源和超时阶段。`, tone: "bad", icon: XCircle }
-    : data.quality.lowConfidenceRate > 0.15
-      ? { label: "质量 HEALTH", title: "部分报告数据覆盖偏低", body: `${formatPercent(data.quality.lowConfidenceRate)} 的报告为低置信度，评分应继续明确标注数据覆盖。`, tone: "warn", icon: AlertTriangle }
-      : { label: "质量 HEALTH", title: "体检服务运行稳定", body: `当前失败率 ${formatPercent(data.quality.failureRate)}，继续观察响应时间与外部数据覆盖。`, tone: "good", icon: CheckCircle2 };
+    : data.quality.registrationUnknownRate > 0.15
+      ? { label: "质量 HEALTH", title: "部分注册状态无法确认", body: `${formatPercent(data.quality.registrationUnknownRate)} 的报告未取得注册资料，应继续补充对应注册局回退源。`, tone: "warn", icon: AlertTriangle }
+      : { label: "质量 HEALTH", title: "体检服务运行稳定", body: `当前失败率 ${formatPercent(data.quality.failureRate)}，注册状态确认率 ${formatPercent(data.quality.registrationConfirmedRate)}。`, tone: "good", icon: CheckCircle2 };
   return [activationInsight, loopInsight, healthInsight];
 }
 
@@ -477,5 +477,6 @@ function formatPercent(value: number): string { return `${(value * 100).toFixed(
 function ratio(numerator: number, denominator: number): number { return denominator > 0 ? numerator / denominator : 0; }
 function priorityLabel(priority: "high" | "medium" | "low"): string { return priority === "high" ? "高" : priority === "medium" ? "中" : "低"; }
 function leadActionLabel(action: "sell" | "buy" | "register"): string { return action === "sell" ? "出售评估" : action === "register" ? "协助注册" : "协助收购"; }
+function registrationStatusLabel(status: string | null): string { return status === "registered" ? "已注册" : status === "available" ? "未发现记录" : "待确认"; }
 function leadStatusLabel(status: string | null): string { return status === "qualified" ? "合格客户" : status === "won" ? "已成交" : status === "lost" ? "已关闭" : status === "contacted" ? "已联系" : "已提交资料"; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Kuala_Lumpur", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }

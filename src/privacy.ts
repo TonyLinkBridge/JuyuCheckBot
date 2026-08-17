@@ -32,7 +32,7 @@ export function privacyHtml(serviceName: string): string {
   <h2>我们保存什么</h2>
   <ul><li>Telegram 数字用户 ID</li><li>用户主动提交的域名与使用意图</li><li>域名报告、来源标记和产品事件</li></ul>
   <h2>为什么保存</h2>
-  <p>用于生成及恢复报告、提供订阅解锁、衡量产品转化和改进 JUYU Domain Score。我们不会保存 Bot Token、密码或其他私人聊天内容，也不会出售这些数据。</p>
+  <p>用于生成及恢复报告、提供订阅解锁、衡量产品转化和改进域名资料覆盖。我们不会保存 Bot Token、密码或其他私人聊天内容，也不会出售这些数据。</p>
   <h2>保留与删除</h2>
   <p>报告、产品事件和不活跃用户资料最多保留 ${PRIVACY_RETENTION_DAYS} 天。你可以在 Telegram Bot 中发送 <code>/privacy</code>，然后选择“删除我的数据”。删除后无法恢复。</p>
   <h2>第三方处理</h2>
@@ -50,7 +50,7 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#090b0
 main{max-width:680px;padding:48px 26px}.tag{color:#58d0a6;font-weight:800;letter-spacing:.08em}h1{font-size:46px;line-height:1.1;margin:14px 0}p{color:#adb5bf;font-size:19px}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}a{padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700}.primary{background:#58d0a6;color:#07100d}.secondary{border:1px solid #343b44;color:#e8eaed}
 </style></head><body><main><div class="tag">JUYU DOMAIN CHECK</div><h1>一个域名到底怎么样？</h1>
-<p>用数据与品牌视角，快速查看域名结构、注册状态、DNS、基础风险与 JUYU Domain Score。</p>
+<p>使用有明确来源的资料，快速查看域名结构、注册状态、DNS 与基础警报。</p>
 <div class="actions"><a class="primary" href="https://t.me/${encodeURIComponent(botUsername)}">打开 Telegram 体检</a><a class="secondary" href="${channelUrl}">JUYU 情报局</a><a class="secondary" href="/privacy">隐私说明</a></div>
 </main></body></html>`;
 }

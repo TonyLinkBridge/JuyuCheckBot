@@ -2,7 +2,7 @@
 
 JUYU 域名体检的内部增长控制台。
 
-包含新用户激活、订阅解锁、推荐增长、商业 Leads、来源质量和体检数据健康监控。Referral Funnel 会追踪分享生成、推荐打开、推荐新用户、域名提交与报告解锁，并显示 K-factor 和表现最佳的分享域名。Lead Conversion 会区分购买、出售与注册意向，追踪进入 `@JuyuDomainBot` 的用户，并按来源显示转化率。`/polls` 提供受保护的 Telegram Poll 发布器，可先发测试频道，再确认发布到正式频道，并自动生成 `src_` 来源链接。
+包含新用户激活、订阅解锁、推荐增长、商业 Leads、来源质量和体检数据健康监控。质量区显示注册状态确认率与私有注册局回退率，不再显示 JUYU 自创结构分。Referral Funnel 会追踪分享生成、推荐打开、推荐新用户、域名提交与报告解锁，并显示 K-factor 和表现最佳的分享域名。Lead Conversion 会区分购买、出售与注册意向，追踪进入 `@JuyuDomainBot` 的用户，并按来源显示转化率。`/polls` 提供受保护的 Telegram Poll 发布器，可先发测试频道，再确认发布到正式频道，并自动生成 `src_` 来源链接。
 
 ## Environment
 

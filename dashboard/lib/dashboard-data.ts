@@ -1,6 +1,6 @@
 import "server-only";
 
-const CURRENT_SCORE_VERSION = "JUYU-1.3";
+const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-2.0";
 
 export const rangeOptions = [
   { value: "1d", label: "24H", days: 1 },
@@ -24,11 +24,7 @@ type GrowthEvent = {
 
 type ReportRow = {
   domain: string;
-  score: number;
-  grade: string;
   score_version: string;
-  confidence: string;
-  data_coverage: number;
   report: Record<string, unknown>;
   created_at: string;
 };
@@ -106,8 +102,9 @@ export type DashboardData = {
       domain: string;
       intent: "owner" | "buyer";
       action: "sell" | "buy" | "register";
-      score: number | null;
-      grade: string | null;
+      evidenceAvailable: number | null;
+      evidenceTotal: number | null;
+      registrationStatus: string | null;
       source: string;
       handedOff: boolean;
       submitted: boolean;
@@ -141,9 +138,9 @@ export type DashboardData = {
   }>;
   quality: {
     reportCount: number;
-    averageScore: number;
-    lowConfidenceRate: number;
-    unavailableRate: number;
+    registrationConfirmedRate: number;
+    registryFallbackRate: number;
+    registrationUnknownRate: number;
     cachedRate: number;
     failureRate: number;
     medianDurationMs: number;
@@ -194,7 +191,7 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         order: "created_at.asc",
       }),
       readAll<ReportRow>(url, key, "domain_reports", {
-        select: "domain,score,grade,score_version,confidence,data_coverage,report,created_at",
+        select: "domain,score_version,report,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
         order: "created_at.asc",
       }),
@@ -282,7 +279,7 @@ function buildDashboard(
   const gateUnlocked = [...gateTokens].filter((token) => unlockedTokens.has(token)).length;
   const recovered = [...failedTokens].filter((token) => unlockedTokens.has(token)).length;
   const currentReports = reports.filter((report) => new Date(report.created_at) >= currentStart);
-  const currentStructureReports = currentReports.filter((report) => report.score_version === CURRENT_SCORE_VERSION);
+  const currentEvidenceReports = currentReports.filter((report) => report.score_version === CURRENT_REPORT_VERSION);
   const previewEvents = current.filter((event) => event.event_name === "preview_shown");
   const durations = previewEvents
     .map((event) => numericMetadata(event, "durationMs"))
@@ -326,14 +323,17 @@ function buildDashboard(
     sources: buildSources(current),
     quality: {
       reportCount: currentReports.length,
-      averageScore: average(currentStructureReports.map((report) => Number(report.score)).filter(Number.isFinite)),
-      lowConfidenceRate: ratio(
-        currentStructureReports.filter((report) => report.confidence === "low").length,
-        currentStructureReports.length,
+      registrationConfirmedRate: ratio(
+        currentEvidenceReports.filter((report) => registrationStatus(report.report) !== "unknown").length,
+        currentEvidenceReports.length,
       ),
-      unavailableRate: ratio(
-        currentStructureReports.filter((report) => activityUnavailable(report.report)).length,
-        currentStructureReports.length,
+      registryFallbackRate: ratio(
+        currentEvidenceReports.filter((report) => registrationSource(report.report) === "registry-whois").length,
+        currentEvidenceReports.length,
+      ),
+      registrationUnknownRate: ratio(
+        currentEvidenceReports.filter((report) => registrationStatus(report.report) === "unknown").length,
+        currentEvidenceReports.length,
       ),
       cachedRate: ratio(
         previewEvents.filter((event) => event.metadata?.cached === true).length,
@@ -499,42 +499,46 @@ function buildLeads(
     if (!event.report_token || !event.domain || (event.intent !== "owner" && event.intent !== "buyer")) continue;
     const handoff = handoffByToken.get(event.report_token);
     const preview = previewByToken.get(event.report_token);
-    const score = numericMetadata(handoff ?? preview ?? event, "score");
-    const gradeValue = (handoff ?? preview ?? event).metadata?.grade;
-    const grade = typeof gradeValue === "string" ? gradeValue : null;
+    const evidenceEvent = handoff ?? preview ?? event;
+    const evidenceAvailable = numericMetadata(evidenceEvent, "evidenceAvailable");
+    const evidenceTotal = numericMetadata(evidenceEvent, "evidenceTotal");
+    const registrationStatusValue = evidenceEvent.metadata?.registrationStatus;
     const action = leadAction(event.intent, handoff?.metadata?.action, handoff?.metadata?.registrationStatus);
     const submittedLead = commerceByUserDomain.get(`${event.telegram_user_id}:${event.domain}`);
     opportunities.set(event.report_token, {
       domain: event.domain,
       intent: event.intent,
       action,
-      score,
-      grade,
+      evidenceAvailable,
+      evidenceTotal,
+      registrationStatus: typeof registrationStatusValue === "string" ? registrationStatusValue : null,
       source: event.source,
       handedOff: Boolean(handoff),
       submitted: Boolean(submittedLead),
       leadStatus: submittedLead?.status ?? null,
-      priority: leadPriority(event.intent, score, Boolean(handoff), Boolean(submittedLead)),
+      priority: leadPriority(event.intent, Boolean(handoff), Boolean(submittedLead)),
       createdAt: submittedLead?.created_at ?? handoff?.created_at ?? event.created_at,
     });
   }
 
   for (const event of handoffEvents) {
     if (!event.report_token || opportunities.has(event.report_token) || !event.domain || (event.intent !== "owner" && event.intent !== "buyer")) continue;
-    const score = numericMetadata(event, "score");
-    const gradeValue = event.metadata?.grade;
+    const evidenceAvailable = numericMetadata(event, "evidenceAvailable");
+    const evidenceTotal = numericMetadata(event, "evidenceTotal");
+    const registrationStatusValue = event.metadata?.registrationStatus;
     const submittedLead = commerceByUserDomain.get(`${event.telegram_user_id}:${event.domain}`);
     opportunities.set(event.report_token, {
       domain: event.domain,
       intent: event.intent,
       action: leadAction(event.intent, event.metadata?.action, event.metadata?.registrationStatus),
-      score,
-      grade: typeof gradeValue === "string" ? gradeValue : null,
+      evidenceAvailable,
+      evidenceTotal,
+      registrationStatus: typeof registrationStatusValue === "string" ? registrationStatusValue : null,
       source: event.source,
       handedOff: true,
       submitted: Boolean(submittedLead),
       leadStatus: submittedLead?.status ?? null,
-      priority: leadPriority(event.intent, score, true, Boolean(submittedLead)),
+      priority: leadPriority(event.intent, true, Boolean(submittedLead)),
       createdAt: submittedLead?.created_at ?? event.created_at,
     });
   }
@@ -647,11 +651,10 @@ function leadAction(
 
 function leadPriority(
   intent: "owner" | "buyer",
-  score: number | null,
   handedOff: boolean,
   submitted: boolean,
 ): "high" | "medium" | "low" {
-  const points = (submitted ? 4 : handedOff ? 3 : 0) + (intent === "buyer" ? 2 : 1) + ((score ?? 0) >= 80 ? 2 : (score ?? 0) >= 65 ? 1 : 0);
+  const points = (submitted ? 4 : handedOff ? 3 : 0) + (intent === "buyer" ? 2 : 1);
   if (points >= 5) return "high";
   if (points >= 3) return "medium";
   return "low";
@@ -671,10 +674,6 @@ function ratio(numerator: number, denominator: number): number {
   return denominator > 0 ? numerator / denominator : 0;
 }
 
-function average(values: number[]): number {
-  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
-}
-
 function median(values: number[]): number {
   if (!values.length) return 0;
   const middle = Math.floor(values.length / 2);
@@ -691,10 +690,15 @@ function stringData(data: Record<string, unknown> | null, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function activityUnavailable(report: Record<string, unknown>): boolean {
-  const dimensions = isRecord(report.dimensions) ? report.dimensions : null;
-  const activity = dimensions && isRecord(dimensions.marketSignals) ? dimensions.marketSignals : null;
-  return activity?.available === false;
+function registrationStatus(report: Record<string, unknown>): string {
+  const rdap = isRecord(report.rdap) ? report.rdap : null;
+  return typeof rdap?.status === "string" ? rdap.status : "unknown";
+}
+
+function registrationSource(report: Record<string, unknown>): string {
+  const rdap = isRecord(report.rdap) ? report.rdap : null;
+  const source = rdap && isRecord(rdap.source) ? rdap.source : null;
+  return typeof source?.type === "string" ? source.type : "unavailable";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -753,9 +757,9 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
     sources: [],
     quality: {
       reportCount: 0,
-      averageScore: 0,
-      lowConfidenceRate: 0,
-      unavailableRate: 0,
+      registrationConfirmedRate: 0,
+      registryFallbackRate: 0,
+      registrationUnknownRate: 0,
       cachedRate: 0,
       failureRate: 0,
       medianDurationMs: 0,

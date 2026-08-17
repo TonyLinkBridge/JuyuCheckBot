@@ -5,6 +5,8 @@ export type NormalizedDomain = {
   ascii: string;
   display: string;
   registrableDomain: string;
+  publicSuffix: string;
+  isPrivateSuffix: boolean;
   subdomain: string | null;
   isIdn: boolean;
 };
@@ -43,6 +45,8 @@ export function normalizeDomain(raw: string): NormalizedDomain {
     ascii,
     display: withoutProtocol.toLowerCase(),
     registrableDomain,
+    publicSuffix: parsed.publicSuffix,
+    isPrivateSuffix: parsed.isPrivate === true,
     subdomain: parsed.subdomain || null,
     isIdn: ascii.includes("xn--"),
   };

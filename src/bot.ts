@@ -4,7 +4,7 @@ import { createBackend, type StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
 import { checkDomain } from "./domain/check.js";
 import { decodeDomainParam, DomainInputError, normalizeDomain } from "./domain/normalize.js";
-import { SCORE_VERSION } from "./domain/score.js";
+import { REPORT_VERSION } from "./domain/evidence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 import {
   checkingText,
@@ -254,9 +254,9 @@ export function createBot(config: Config): Bot {
       intent,
       metadata: {
         action,
-        score: stored.report.score,
-        grade: stored.report.grade,
         registrationStatus: stored.report.rdap.status,
+        registrationSource: stored.report.rdap.source.type,
+        dataCoverage: stored.report.dataCoverage,
       },
     });
 
@@ -397,7 +397,7 @@ export function createBot(config: Config): Bot {
     let report: DomainReport;
     let cached = false;
     try {
-      const cachedReport = await backend.getRecentReport(domain.ascii, SCORE_VERSION, reportCacheMs);
+      const cachedReport = await backend.getRecentReport(domain.ascii, REPORT_VERSION, reportCacheMs);
       cached = Boolean(cachedReport);
       [report] = await Promise.all([
         cachedReport ? Promise.resolve(cachedReport) : checkDomain(domain, config.CHECK_TIMEOUT_MS),
@@ -422,15 +422,14 @@ export function createBot(config: Config): Bot {
         domain: report.domain,
         reportToken: token,
         metadata: {
-          score: report.score,
-          grade: report.grade,
-          scoreVersion: report.scoreVersion,
+          reportVersion: report.reportVersion,
           cached,
-          confidence: report.confidence,
-          evidenceGrade: report.evidenceGrade,
-          provisional: report.provisional,
-          marketEvidence: report.marketEvidence,
           dataCoverage: report.dataCoverage,
+          evidenceAvailable: report.evidenceItems.filter((item) => item.available).length,
+          evidenceTotal: report.evidenceItems.length,
+          registrationStatus: report.rdap.status,
+          registrationSource: report.rdap.source.type,
+          alertCount: report.alerts.length,
           durationMs: Date.now() - checkStartedAt,
         },
       });
