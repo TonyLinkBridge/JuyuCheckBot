@@ -31,6 +31,7 @@
 - `JUYU-1.3` 对 RDAP / DNS 临时失败执行重试；证据不足时标记暂定分，基础活跃度与风险不参与结构总分
 - 推荐打开按独立用户计数，最近报告按域名去重
 - 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与数据健康监控
+- Dashboard Poll 引流发布器：测试/正式频道双目标、服务器端 Token、正式发布确认与 `src_` Campaign 自动归因
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
 ## 本地启动
@@ -102,6 +103,9 @@ SUPABASE_SERVICE_ROLE_KEY
 COMMERCE_SUPABASE_URL
 COMMERCE_SUPABASE_SECRET_KEY
 DASHBOARD_PASSWORD=至少12位的独立强密码
+TELEGRAM_BOT_TOKEN=与 JuyuCheckBot 相同的 BotFather Token
+POLL_TEST_CHAT_ID=@juyuofficial
+POLL_PRODUCTION_CHAT_ID=@JUYU007
 ```
 
 本地运行：

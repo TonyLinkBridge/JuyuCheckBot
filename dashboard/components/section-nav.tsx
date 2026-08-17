@@ -1,6 +1,7 @@
 "use client";
 
-import { Activity, Briefcase, CircleGauge, GitFork, LayoutDashboard, Send, Workflow } from "lucide-react";
+import { Activity, Briefcase, CircleGauge, GitFork, LayoutDashboard, Megaphone, Send, Workflow } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +22,13 @@ function isSectionId(value: string): value is SectionId {
 }
 
 export function SectionNav() {
+  const pathname = usePathname();
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
   const frame = useRef<number | null>(null);
 
   useEffect(() => {
+    if (pathname !== "/") return;
+
     function updateActiveSection() {
       const marker = window.scrollY + Math.min(180, window.innerHeight * 0.3);
       const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
@@ -59,9 +63,10 @@ export function SectionNav() {
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("hashchange", scheduleUpdate);
     };
-  }, []);
+  }, [pathname]);
 
   function navigateTo(id: SectionId) {
+    if (pathname !== "/") return;
     const section = document.getElementById(id);
     if (!section) return;
     setActiveSection(id);
@@ -77,11 +82,12 @@ export function SectionNav() {
       <p>Workspace</p>
       {sections.map(({ id, label, icon: Icon }) => (
         <a
-          href={`#${id}`}
+          href={pathname === "/" ? `#${id}` : `/#${id}`}
           key={id}
-          className={cn(activeSection === id && "active")}
-          aria-current={activeSection === id ? "page" : undefined}
+          className={cn(pathname === "/" && activeSection === id && "active")}
+          aria-current={pathname === "/" && activeSection === id ? "page" : undefined}
           onClick={(event) => {
+            if (pathname !== "/") return;
             event.preventDefault();
             navigateTo(id);
           }}
@@ -90,6 +96,11 @@ export function SectionNav() {
           <span>{label}</span>
         </a>
       ))}
+      <p className="nav-group-label">Campaigns</p>
+      <a href="/polls" className={cn(pathname === "/polls" && "active")} aria-current={pathname === "/polls" ? "page" : undefined}>
+        <Megaphone size={16} aria-hidden="true" />
+        <span>Poll 引流</span>
+      </a>
     </nav>
   );
 }

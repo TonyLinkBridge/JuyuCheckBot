@@ -14,7 +14,6 @@ import {
   Fingerprint,
   Gauge,
   GitFork,
-  LogOut,
   Radio,
   RefreshCw,
   Share2,
@@ -26,11 +25,10 @@ import {
   Wrench,
   XCircle,
 } from "lucide-react";
-import { logout } from "@/app/actions";
+import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { GrowthAreaChart } from "@/components/tremor/growth-area-chart";
-import { SectionNav } from "@/components/section-nav";
 import { SourceBarChart } from "@/components/tremor/source-bar-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { rangeOptions, type DashboardData, type Metric } from "@/lib/dashboard-data";
@@ -74,7 +72,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const insights = buildInsights(data);
   return (
     <div className="dashboard-shell">
-      <Sidebar />
+      <AppSidebar />
       <main className="dashboard-main">
         <Topbar data={data} />
         <div className="dashboard-content">
@@ -203,25 +201,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
         </div>
       </main>
     </div>
-  );
-}
-
-function Sidebar() {
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-mark">J</div>
-        <div><strong>JUYU</strong><span>Growth Intelligence</span></div>
-      </div>
-      <SectionNav />
-      <div className="sidebar-status">
-        <div className="status-row"><span className="status-pulse" /><span>Bot 在线</span><Badge>LIVE</Badge></div>
-        <p>@JuyuCheckBot</p>
-      </div>
-      <form action={logout}>
-        <button className="signout-button" type="submit"><LogOut size={15} aria-hidden="true" /> 退出 Sign out</button>
-      </form>
-    </aside>
   );
 }
 
