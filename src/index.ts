@@ -20,7 +20,18 @@ app.get("/privacy", (_request, response) => {
   response.type("html").send(privacyHtml("JUYU 域名体检"));
 });
 app.get("/health", (_request, response) => {
-  response.status(200).json({ ok: true, service: "juyu-domain-check", version: "0.9.0", reportVersion: REPORT_VERSION });
+  response.status(200).json({
+    ok: true,
+    service: "juyu-domain-check",
+    version: "0.10.0",
+    reportVersion: REPORT_VERSION,
+    externalData: {
+      tranco: "enabled",
+      wayback: "enabled",
+      crux: config.GOOGLE_CRUX_API_KEY ? "configured" : "not_configured",
+      ahrefs: config.AHREFS_API_KEY ? "configured" : "not_configured",
+    },
+  });
 });
 app.post(TELEGRAM_WEBHOOK_PATH, async (request, response, next) => {
   if (!config.WEBHOOK_SECRET) {

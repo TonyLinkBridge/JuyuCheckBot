@@ -81,6 +81,8 @@ export function gateText(config: Config): string {
 ✓ 注册状态、注册商、域龄与到期日
 ✓ RDAP / 对应注册局资料来源
 ✓ DNS、Nameserver、MX 与 DNSSEC
+✓ Tranco 全球排名与 Wayback 网站历史
+✓ Chrome UX Report 与 Ahrefs DR（有资料时）
 ✓ 名称结构事实与基础警报
 ✓ 根据你的目的生成行动建议
 
@@ -143,6 +145,14 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
 ${evidenceLines}
 
 ━━━━━━━━━━━━━━
+🌍 <b>WEB INTELLIGENCE｜第三方真实指标</b>
+${externalIntelligenceText(report)}
+
+<b>商标与成交边界</b>
+• WIPO 商标：需到官方数据库人工查询（不自动抓取）
+• 成交/价格：本次没有已核验案例时，不显示价格区间
+
+━━━━━━━━━━━━━━
 🔎 <b>STRUCTURE｜名称结构事实</b>
 ${structureLines}
 
@@ -184,6 +194,7 @@ export function fullReportKeyboard(
   } else {
     keyboard.row().url("🌐 查看 JUYU 官方服务", "https://www.juyu.com/");
   }
+  keyboard.row().url("®️ WIPO 官方商标查询", "https://branddb.wipo.int/");
   keyboard.row().text("🔄 重新实时检查", `refresh:${token}`);
   keyboard.row().text("🔎 继续体检", "check_another");
   return keyboard;
@@ -352,6 +363,54 @@ function registrationSource(report: DomainReport): string {
   return report.rdap.source.url
     ? `<a href="${escapeHtml(report.rdap.source.url)}">${name}</a>`
     : name;
+}
+
+function externalIntelligenceText(report: DomainReport): string {
+  const tranco = report.intelligence.tranco.status === "available" && report.intelligence.tranco.rank !== null
+    ? `• Tranco 全球排名：<b>#${formatInteger(report.intelligence.tranco.rank)}</b>${report.intelligence.tranco.rankedAt ? `（${escapeHtml(report.intelligence.tranco.rankedAt)}）` : ""}\n  <a href="https://tranco-list.eu/">来源：Tranco</a>`
+    : `• Tranco 全球排名：${externalStatusLabel(report.intelligence.tranco.status, "未进入最近的 Top 1,000,000")}`;
+
+  const crux = report.intelligence.crux;
+  const cruxLine = crux.status === "available"
+    ? `• Chrome UX Report（Google 真实用户 p75）\n  LCP：${formatCruxValue(crux.lcpP75Ms, "ms", 2500, 4000)}\n  INP：${formatCruxValue(crux.inpP75Ms, "ms", 200, 500)}\n  CLS：${formatCruxValue(crux.clsP75, "", 0.1, 0.25)}${crux.periodStart && crux.periodEnd ? `\n  数据期：${escapeHtml(crux.periodStart)} 至 ${escapeHtml(crux.periodEnd)}` : ""}\n  <a href="https://developer.chrome.com/docs/crux/">来源：Chrome UX Report</a>`
+    : `• Chrome UX Report：${externalStatusLabel(crux.status, "未达到 Google 的公开数据门槛")}`;
+
+  const ahrefs = report.intelligence.ahrefs.status === "available" && report.intelligence.ahrefs.domainRating !== null
+    ? `• Domain Rating by <a href="https://ahrefs.com/">Ahrefs</a>：<b>${formatDecimal(report.intelligence.ahrefs.domainRating)}</b> / 100`
+    : `• Ahrefs Domain Rating (DR)：${externalStatusLabel(report.intelligence.ahrefs.status, "未发现资料")}`;
+
+  const wayback = report.intelligence.wayback;
+  const waybackLine = wayback.status === "available"
+    ? `• Internet Archive 网站历史\n  最早快照：${linkedDate(wayback.firstCaptureAt, wayback.firstCaptureUrl)}\n  最近快照：${linkedDate(wayback.latestCaptureAt, wayback.latestCaptureUrl)}`
+    : `• Internet Archive 网站历史：${externalStatusLabel(wayback.status, "未发现公开快照")}`;
+
+  return [tranco, cruxLine, ahrefs, waybackLine].join("\n");
+}
+
+function externalStatusLabel(status: DomainReport["intelligence"]["tranco"]["status"], notFound: string): string {
+  if (status === "not_found") return notFound;
+  if (status === "not_configured") return "尚未启用免费 API Key";
+  return "本次资料源暂不可用";
+}
+
+function formatCruxValue(value: number | null, unit: "ms" | "", good: number, poor: number): string {
+  if (value === null) return "该指标无资料";
+  const display = unit === "ms" ? `${formatInteger(value)} ms` : value.toFixed(3);
+  const label = value <= good ? "良好" : value <= poor ? "需要改善" : "较差";
+  return `${display}（${label}）`;
+}
+
+function linkedDate(date: Date | null, url: string | null): string {
+  const label = formatDate(date);
+  return url ? `<a href="${escapeHtml(url)}">${label}</a>` : label;
+}
+
+function formatInteger(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatDecimal(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
 }
 
 function formatValues(values: string[], limit = 4): string {

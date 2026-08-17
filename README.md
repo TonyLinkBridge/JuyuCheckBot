@@ -16,7 +16,8 @@
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
 - 通过 IANA Bootstrap 直达权威注册局 RDAP，并进行原生 DNS 检查，不使用演示数据
-- `JUYU-EVIDENCE-2.1` 证据型报告：注册资料、具体 DNS、资料来源、取得时间、资料完整度与基础警报，不提供自创总分
+- `JUYU-EVIDENCE-3.0` 证据型报告：注册资料、具体 DNS、资料来源、取得时间、资料完整度与基础警报，不提供自创总分
+- 免费第三方事实层：Tranco 全球排名、Internet Archive 网站历史，以及配置免费 Key 后的 Chrome UX Report 与 Ahrefs Domain Rating
 - ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
 - Preview → 意图 → Growth Gate → `DATA / STRUCTURE / ACTION` 报告
 - `getChatMember` 频道订阅验证和完整报告 Growth Gate
@@ -67,6 +68,8 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    WEBHOOK_URL=https://你的稳定正式域名
    WEBHOOK_SECRET=至少16位、只含 A-Z a-z 0-9 _ - 的随机字符串
    CHECK_TIMEOUT_MS=8000
+   GOOGLE_CRUX_API_KEY=可选的免费_Google_API_Key
+   AHREFS_API_KEY=可选的免费_Ahrefs_API_Key
    SUPABASE_URL
    SUPABASE_SERVICE_ROLE_KEY
    ```
@@ -76,7 +79,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.9.0", "reportVersion": "JUYU-EVIDENCE-2.1" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.10.0", "reportVersion": "JUYU-EVIDENCE-3.0" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：
@@ -149,7 +152,19 @@ npm run dashboard:dev
 
 ## Evidence Report 边界
 
-`JUYU-EVIDENCE-2.1` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局；报告显示取得的注册资料、具体 DNS、明确来源、查询时间、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
+`JUYU-EVIDENCE-3.0` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局；报告显示取得的注册资料、具体 DNS、明确来源、查询时间、名称结构事实与基础警报。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。
+
+第三方资料严格按来源原名显示：Tranco 排名不换算成 JUYU 分数；Chrome UX Report 显示 Google 汇总的真实 Chrome 用户 p75 数据；Ahrefs 显示 `Domain Rating by Ahrefs` 并保留官方归属；Internet Archive 只显示可点击的公开快照日期。第三方没有收录、Key 未配置、请求失败会分别显示，彼此不混为“低分”。
+
+WIPO Global Brand Database 禁止自动化抓取，因此 Bot 只提供官方查询按钮，不自动声称商标数量。Semrush Authority Score 和 Similarweb API 属于付费/额度制，本免费版本不接入。只有逐条记录域名、价格、日期与原始来源的已核验成交资料，未来才会显示；没有足够可比案例时不输出价格区间。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
+
+### 免费第三方 Key
+
+- Chrome UX Report：在 Google Cloud 启用 Chrome UX Report API 并创建 API Key，填入 `GOOGLE_CRUX_API_KEY`。API 免费；只有达到 Google 数据门槛的网站才有资料。
+- Ahrefs DR：注册免费 Ahrefs 账户，在 Account settings → API keys 建立 Key，填入 `AHREFS_API_KEY`。官方免费 DR endpoint 不消耗 API units，但要求显示 `Domain Rating by Ahrefs`。
+- Tranco 与 Internet Archive 不需要 Key。
+
+这些 Key 只放在 Vercel Production Environment Variables 和本地 `.env`，不要提交进 GitHub。
 
 ## Supabase 后端
 

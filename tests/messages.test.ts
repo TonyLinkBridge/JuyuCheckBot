@@ -12,12 +12,34 @@ import {
 } from "../src/messages.js";
 
 const report = {
-  reportVersion: "JUYU-EVIDENCE-2.1",
+  reportVersion: "JUYU-EVIDENCE-3.0",
   domain: "example.com",
   registrableDomain: "example.com",
   isSubdomain: false,
   isIdn: false,
   checkedAt: new Date("2026-08-17T00:00:00Z"),
+  intelligence: {
+    tranco: { status: "available", rank: 42, rankedAt: "2026-08-16", checkedAt: new Date("2026-08-17T00:00:00Z") },
+    crux: {
+      status: "available",
+      origin: "https://example.com",
+      lcpP75Ms: 1800,
+      inpP75Ms: 150,
+      clsP75: 0.05,
+      periodStart: "2026-07-20",
+      periodEnd: "2026-08-16",
+      checkedAt: new Date("2026-08-17T00:00:00Z"),
+    },
+    ahrefs: { status: "available", domainRating: 93, checkedAt: new Date("2026-08-17T00:00:00Z") },
+    wayback: {
+      status: "available",
+      firstCaptureAt: new Date("1996-01-01T00:00:00Z"),
+      latestCaptureAt: new Date("2026-08-01T00:00:00Z"),
+      firstCaptureUrl: "https://web.archive.org/web/19960101000000/https://example.com/",
+      latestCaptureUrl: "https://web.archive.org/web/20260801000000/https://example.com/",
+      checkedAt: new Date("2026-08-17T00:00:00Z"),
+    },
+  },
   dataCoverage: 100,
   ageYears: 26,
   daysToExpiry: 1200,
@@ -128,7 +150,7 @@ describe("commerce lead messages", () => {
 
     expect(ownerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:owner:token_123");
     expect(buyerKeyboard.inline_keyboard[1]?.[0]?.callback_data).toBe("lead:buyer:token_123");
-    expect(buyerKeyboard.inline_keyboard[2]?.[0]?.callback_data).toBe("refresh:token_123");
+    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
   });
 
   it("shows concrete DNS values, source authority and lookup times", () => {
@@ -138,6 +160,11 @@ describe("commerce lead messages", () => {
     expect(text).toContain("ns1.example.com");
     expect(text).toContain("权威注册局资料");
     expect(text).toContain("取得时间");
+    expect(text).toContain("Tranco 全球排名：<b>#42</b>");
+    expect(text).toContain("Chrome UX Report（Google 真实用户 p75）");
+    expect(text).toContain("Domain Rating by");
+    expect(text).toContain("Internet Archive 网站历史");
+    expect(text.length).toBeLessThan(4096);
   });
 
   it("builds a Commerce Bot deep link with the action and encoded domain", () => {

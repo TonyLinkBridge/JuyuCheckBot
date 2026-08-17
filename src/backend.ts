@@ -1,5 +1,6 @@
 import type { Config } from "./config.js";
 import { buildEvidence } from "./domain/evidence.js";
+import { emptyIntelligence } from "./domain/intelligence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 
 export type GrowthEventName =
@@ -456,6 +457,7 @@ function reviveDomainReport(value: unknown): DomainReport | null {
   };
   const registrableDomain = typeof value.registrableDomain === "string" ? value.registrableDomain : value.domain;
   const isIdn = value.isIdn === true;
+  const intelligence = reviveIntelligence(value.intelligence, registrableDomain, checkedAt);
   const evidence = buildEvidence({ domain: value.domain, registrableDomain, isIdn, rdap, dns, now: checkedAt });
   return {
     domain: value.domain,
@@ -465,8 +467,53 @@ function reviveDomainReport(value: unknown): DomainReport | null {
     checkedAt,
     rdap,
     dns,
+    intelligence,
     ...evidence,
     reportVersion: typeof value.reportVersion === "string" ? value.reportVersion : `${evidence.reportVersion} · legacy data`,
+  };
+}
+
+function reviveIntelligence(
+  value: unknown,
+  domain: string,
+  checkedAt: Date,
+): DomainReport["intelligence"] {
+  const fallback = emptyIntelligence(domain, checkedAt);
+  if (!isRecord(value)) return fallback;
+  const tranco = isRecord(value.tranco) ? value.tranco : {};
+  const crux = isRecord(value.crux) ? value.crux : {};
+  const ahrefs = isRecord(value.ahrefs) ? value.ahrefs : {};
+  const wayback = isRecord(value.wayback) ? value.wayback : {};
+  return {
+    tranco: {
+      status: externalStatus(tranco.status),
+      rank: finiteNumberOrNull(tranco.rank),
+      rankedAt: typeof tranco.rankedAt === "string" ? tranco.rankedAt : null,
+      checkedAt: reviveDate(tranco.checkedAt) ?? checkedAt,
+    },
+    crux: {
+      status: externalStatus(crux.status),
+      origin: typeof crux.origin === "string" ? crux.origin : `https://${domain}`,
+      lcpP75Ms: finiteNumberOrNull(crux.lcpP75Ms),
+      inpP75Ms: finiteNumberOrNull(crux.inpP75Ms),
+      clsP75: finiteNumberOrNull(crux.clsP75),
+      periodStart: typeof crux.periodStart === "string" ? crux.periodStart : null,
+      periodEnd: typeof crux.periodEnd === "string" ? crux.periodEnd : null,
+      checkedAt: reviveDate(crux.checkedAt) ?? checkedAt,
+    },
+    ahrefs: {
+      status: externalStatus(ahrefs.status),
+      domainRating: finiteNumberOrNull(ahrefs.domainRating),
+      checkedAt: reviveDate(ahrefs.checkedAt) ?? checkedAt,
+    },
+    wayback: {
+      status: externalStatus(wayback.status),
+      firstCaptureAt: reviveNullableDate(wayback.firstCaptureAt),
+      latestCaptureAt: reviveNullableDate(wayback.latestCaptureAt),
+      firstCaptureUrl: typeof wayback.firstCaptureUrl === "string" ? wayback.firstCaptureUrl : null,
+      latestCaptureUrl: typeof wayback.latestCaptureUrl === "string" ? wayback.latestCaptureUrl : null,
+      checkedAt: reviveDate(wayback.checkedAt) ?? checkedAt,
+    },
   };
 }
 
@@ -496,4 +543,15 @@ function stringArray(value: unknown): string[] {
 
 function isRegistrationSourceType(value: unknown): value is DomainReport["rdap"]["source"]["type"] {
   return value === "rdap" || value === "registry-whois" || value === "unavailable";
+}
+
+function externalStatus(value: unknown): DomainReport["intelligence"]["tranco"]["status"] {
+  return value === "available" || value === "not_found" || value === "not_configured" || value === "unavailable"
+    ? value
+    : "unavailable";
+}
+
+function finiteNumberOrNull(value: unknown): number | null {
+  const number = typeof value === "number" ? value : Number.NaN;
+  return Number.isFinite(number) ? number : null;
 }

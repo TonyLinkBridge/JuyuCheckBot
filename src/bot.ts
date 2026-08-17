@@ -423,7 +423,13 @@ export function createBot(config: Config): Bot {
         : await backend.getRecentReport(domain.ascii, REPORT_VERSION, reportCacheMs);
       cached = Boolean(cachedReport);
       [report] = await Promise.all([
-        cachedReport ? Promise.resolve(cachedReport) : checkDomain(domain, config.CHECK_TIMEOUT_MS),
+        cachedReport
+          ? Promise.resolve(cachedReport)
+          : checkDomain(domain, {
+              timeoutMs: config.CHECK_TIMEOUT_MS,
+              googleCruxApiKey: config.GOOGLE_CRUX_API_KEY,
+              ahrefsApiKey: config.AHREFS_API_KEY,
+            }),
         submittedEvent,
       ]);
       const token = reports.put(userId, report);

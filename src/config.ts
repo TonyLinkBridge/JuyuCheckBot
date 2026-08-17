@@ -16,6 +16,8 @@ const schema = z.object({
     .pipe(z.string().min(16).max(256).regex(/^[A-Za-z0-9_-]+$/, "WEBHOOK_SECRET 只能包含字母、数字、_ 和 -").optional()),
   PORT: z.coerce.number().int().positive().default(3000),
   CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
+  GOOGLE_CRUX_API_KEY: z.string().optional().transform(emptyToUndefined),
+  AHREFS_API_KEY: z.string().optional().transform(emptyToUndefined),
   SUPABASE_URL: z.string().optional().transform(emptyToUndefined),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().transform(emptyToUndefined),
 });

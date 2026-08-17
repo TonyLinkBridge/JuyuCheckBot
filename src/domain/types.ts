@@ -53,6 +53,48 @@ export type StructureFacts = {
   characterType: "ascii-letters" | "ascii-mixed" | "idn";
 };
 
+export type ExternalDataStatus = "available" | "not_found" | "not_configured" | "unavailable";
+
+export type TrancoResult = {
+  status: ExternalDataStatus;
+  rank: number | null;
+  rankedAt: string | null;
+  checkedAt: Date;
+};
+
+export type CruxResult = {
+  status: ExternalDataStatus;
+  origin: string;
+  lcpP75Ms: number | null;
+  inpP75Ms: number | null;
+  clsP75: number | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  checkedAt: Date;
+};
+
+export type AhrefsResult = {
+  status: ExternalDataStatus;
+  domainRating: number | null;
+  checkedAt: Date;
+};
+
+export type WaybackResult = {
+  status: ExternalDataStatus;
+  firstCaptureAt: Date | null;
+  latestCaptureAt: Date | null;
+  firstCaptureUrl: string | null;
+  latestCaptureUrl: string | null;
+  checkedAt: Date;
+};
+
+export type DomainIntelligence = {
+  tranco: TrancoResult;
+  crux: CruxResult;
+  ahrefs: AhrefsResult;
+  wayback: WaybackResult;
+};
+
 export type DomainReport = {
   reportVersion: string;
   domain: string;
@@ -62,6 +104,7 @@ export type DomainReport = {
   checkedAt: Date;
   rdap: RdapResult;
   dns: DnsResult;
+  intelligence: DomainIntelligence;
   ageYears: number | null;
   daysToExpiry: number | null;
   dataCoverage: number;
