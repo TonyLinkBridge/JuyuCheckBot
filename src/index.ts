@@ -7,6 +7,7 @@ import { REPORT_VERSION } from "./domain/evidence.js";
 import type { DomainIntent } from "./domain/types.js";
 import { juchaDomainLink } from "./messages.js";
 import { landingHtml, privacyHtml } from "./privacy.js";
+import { TELEGRAM_ALLOWED_UPDATES } from "./telegram.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
 
@@ -57,7 +58,7 @@ app.get("/health", (_request, response) => {
   response.status(200).json({
     ok: true,
     service: "juyu-domain-check",
-    version: "0.14.0",
+    version: "0.15.0",
     reportVersion: REPORT_VERSION,
     externalData: {
       tranco: "enabled",
@@ -106,7 +107,7 @@ async function startLocalProcess(): Promise<void> {
   if (config.WEBHOOK_URL && config.WEBHOOK_SECRET) {
     await bot.api.setWebhook(`${config.WEBHOOK_URL}${TELEGRAM_WEBHOOK_PATH}`, {
       secret_token: config.WEBHOOK_SECRET,
-      allowed_updates: ["message", "callback_query"],
+      allowed_updates: TELEGRAM_ALLOWED_UPDATES,
     });
     app.listen(config.PORT, () => console.log(`JUYU Domain Check webhook listening on :${config.PORT}`));
     return;
@@ -114,7 +115,7 @@ async function startLocalProcess(): Promise<void> {
 
   await bot.api.deleteWebhook({ drop_pending_updates: false });
   bot.start({
-    allowed_updates: ["message", "callback_query"],
+    allowed_updates: TELEGRAM_ALLOWED_UPDATES,
     onStart: () => console.log("JUYU Domain Check bot started with long polling"),
   });
 }

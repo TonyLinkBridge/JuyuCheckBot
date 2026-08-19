@@ -12,6 +12,8 @@ import {
   referralWelcomeText,
   shareCardKeyboard,
   shareCardText,
+  inlineShareResult,
+  inlineShareToken,
   technicalReportText,
 } from "../src/messages.js";
 
@@ -95,11 +97,11 @@ const report = {
 } as DomainReport;
 
 describe("referral growth messages", () => {
-  it("builds a share card with social proof and a private report-token deep link", () => {
+  it("builds a share card that opens Telegram inline sharing without exposing user IDs", () => {
     const config = loadConfig({ BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz", BOT_USERNAME: "JuyuCheckBot" });
     const text = shareCardText(report);
-    const keyboard = shareCardKeyboard(config, report, "token_123");
-    const shareUrl = keyboard.inline_keyboard[0]?.[0]?.url;
+    const keyboard = shareCardKeyboard("token_123");
+    const shareButton = keyboard.inline_keyboard[0]?.[0];
 
     expect(text).toContain("可验证信号");
     expect(text).toContain("基础 7/7 项");
@@ -107,8 +109,33 @@ describe("referral growth messages", () => {
     expect(text).not.toContain("Domain Rating by Ahrefs：93 / 100");
     expect(text).toContain("不做自创评分");
     expect(text).not.toContain("JUYU Score");
-    expect(shareUrl).toContain("t.me%2FJuyuCheckBot%3Fstart%3Dref_token_123");
-    expect(shareUrl).not.toContain("telegram_user_id");
+    expect(shareButton?.text).toBe("📤 分享带按钮的体检");
+    expect(shareButton?.switch_inline_query).toBe("share_token_123");
+    expect(JSON.stringify(shareButton)).not.toContain("telegram_user_id");
+  });
+
+  it("builds an inline share result with a direct button back to the bot", () => {
+    const config = loadConfig({ BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz", BOT_USERNAME: "JuyuCheckBot" });
+    const result = inlineShareResult(config, report, "token_123");
+
+    expect(result.type).toBe("article");
+    expect(result.title).toBe("分享 example.com 的 JUYU 体检");
+    expect(result.input_message_content).toMatchObject({
+      message_text: shareCardText(report),
+      parse_mode: "HTML",
+    });
+    expect(result.reply_markup?.inline_keyboard[0]?.[0]?.text).toBe("🔍 免费检查我的域名");
+    expect(result.reply_markup?.inline_keyboard[0]?.[0]?.url).toBe(
+      "https://t.me/JuyuCheckBot?start=ref_token_123",
+    );
+    expect(JSON.stringify(result)).not.toContain("telegram_user_id");
+  });
+
+  it("accepts only a private report-token inline share query", () => {
+    expect(inlineShareToken("share_token_123")).toBe("token_123");
+    expect(inlineShareToken("share_token 123")).toBeNull();
+    expect(inlineShareToken("example.com")).toBeNull();
+    expect(inlineShareToken("share_")).toBeNull();
   });
 
   it("welcomes referred visitors without automatically checking the shared domain", () => {

@@ -1,4 +1,5 @@
 import { InlineKeyboard } from "grammy";
+import type { InlineQueryResultArticle } from "grammy/types";
 import type { StoredReport } from "./backend.js";
 import type { Config } from "./config.js";
 import { encodeDomainParam } from "./domain/normalize.js";
@@ -262,16 +263,36 @@ ${shareSignalLines(report)}
 免费域名体检 · Powered by JUYU 聚域</i>`;
 }
 
-export function shareCardKeyboard(config: Config, report: DomainReport, token: string): InlineKeyboard {
-  const reportLink = referralLink(config.BOT_USERNAME, token);
-  const shareText = `我刚用 JUYU 查了 ${report.domain}：\n\n${decisionConclusion(report, "research")}\n\n资料来源和缺失项目都会明确显示，不使用自创评分。你也可以免费查一个域名 👇`;
+export function shareCardKeyboard(token: string): InlineKeyboard {
   return new InlineKeyboard()
-    .url(
-      "📤 分享这份体检",
-      `https://t.me/share/url?url=${encodeURIComponent(reportLink)}&text=${encodeURIComponent(shareText)}`,
-    )
+    .switchInline("📤 分享带按钮的体检", `share_${token}`)
     .row()
     .text("🔎 继续体检", "check_another");
+}
+
+export function inlineShareResult(
+  config: Config,
+  report: DomainReport,
+  token: string,
+): InlineQueryResultArticle {
+  const reportLink = referralLink(config.BOT_USERNAME, token);
+  return {
+    type: "article",
+    id: `share_${token}`.slice(0, 64),
+    title: `分享 ${report.domain} 的 JUYU 体检`,
+    description: decisionConclusion(report, "research"),
+    input_message_content: {
+      message_text: shareCardText(report),
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    },
+    reply_markup: new InlineKeyboard()
+      .url("🔍 免费检查我的域名", reportLink),
+  };
+}
+
+export function inlineShareToken(query: string): string | null {
+  return /^share_([A-Za-z0-9_-]+)$/.exec(query)?.[1] ?? null;
 }
 
 export function referralWelcomeText(report: DomainReport): string {

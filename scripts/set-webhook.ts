@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { Bot } from "grammy";
 import { loadConfig } from "../src/config.js";
+import { TELEGRAM_ALLOWED_UPDATES } from "../src/telegram.js";
 
 const WEBHOOK_PATH = "/telegram/webhook";
 const config = loadConfig();
@@ -27,7 +28,7 @@ await bot.api.setMyCommands([
 ]);
 await bot.api.setWebhook(`${url.origin}${WEBHOOK_PATH}`, {
   secret_token: config.WEBHOOK_SECRET,
-  allowed_updates: ["message", "callback_query"],
+  allowed_updates: TELEGRAM_ALLOWED_UPDATES,
 });
 
 const info = await bot.api.getWebhookInfo();

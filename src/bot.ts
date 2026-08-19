@@ -18,6 +18,8 @@ import {
   helpText,
   intentKeyboard,
   intentPromptText,
+  inlineShareResult,
+  inlineShareToken,
   notSubscribedText,
   previewReportText,
   privacyKeyboard,
@@ -85,7 +87,7 @@ export function createBot(config: Config): Bot {
           ...startEvents,
           ctx.reply(`👀 <b>这是你生成的分享页面</b>\n\n${shareCardText(sharedReferral.report)}`, {
             ...html,
-            reply_markup: shareCardKeyboard(config, sharedReferral.report, referralToken),
+            reply_markup: shareCardKeyboard(referralToken),
           }),
         ]);
         return;
@@ -251,7 +253,7 @@ export function createBot(config: Config): Bot {
       }),
       ctx.reply(shareCardText(stored.report), {
         ...html,
-        reply_markup: shareCardKeyboard(config, stored.report, token),
+        reply_markup: shareCardKeyboard(token),
       }),
     ]);
   });
@@ -393,6 +395,23 @@ export function createBot(config: Config): Bot {
       return;
     }
     await deliverFullReport(ctx, report, token, intent, source);
+  });
+
+  bot.on("inline_query", async (ctx) => {
+    const token = inlineShareToken(ctx.inlineQuery.query);
+    if (!token) {
+      await ctx.answerInlineQuery([], { cache_time: 0, is_personal: true });
+      return;
+    }
+
+    try {
+      const stored = await backend.getReferralReport(token);
+      const results = stored ? [inlineShareResult(config, stored.report, token)] : [];
+      await ctx.answerInlineQuery(results, { cache_time: 0, is_personal: true });
+    } catch (error) {
+      console.error("Unable to prepare inline share", error instanceof Error ? error.message : "unknown error");
+      await ctx.answerInlineQuery([], { cache_time: 0, is_personal: true });
+    }
   });
 
   bot.on("message:text", async (ctx) => {
