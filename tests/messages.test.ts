@@ -185,12 +185,12 @@ describe("commerce lead messages", () => {
     const buyerKeyboard = fullReportKeyboard(config, report, "buyer", "token_123");
     const researchKeyboard = fullReportKeyboard(config, report, "research", "token_123");
 
-    expect(ownerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
-    expect(buyerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
+    expect(ownerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
+    expect(buyerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
     expect(ownerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "lead:owner:token_123")).toBe(true);
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "lead:buyer:token_123")).toBe(true);
-    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.url?.startsWith("https://www.jucha.com/juhe/"))).toBe(true);
-    expect(researchKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
+    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.url?.startsWith("https://www.jucha.com/zonghe/example.com"))).toBe(true);
+    expect(researchKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
   });
 
@@ -259,7 +259,8 @@ describe("commerce lead messages", () => {
 
     expect(handoff).toBe("https://juyu-check-bot.vercel.app/go/jucha?report=token_123&intent=research");
     expect(handoff).not.toContain("telegram_user_id");
-    expect(destination).toContain("domain=example.com");
+    expect(destination).toContain("https://www.jucha.com/zonghe/example.com");
+    expect(destination).not.toContain("domain=example.com");
     expect(destination).toContain("utm_campaign=juyu_domain_check");
   });
 });

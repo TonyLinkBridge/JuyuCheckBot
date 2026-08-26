@@ -407,7 +407,10 @@ export function juchaHandoffLink(
 
 export function juchaDomainLink(baseUrl: string, domain: string, intent: DomainIntent = "research"): string {
   const url = new URL(baseUrl);
-  if (domain) url.searchParams.set("domain", domain);
+  if (domain) {
+    url.pathname = `/zonghe/${encodeURIComponent(domain)}`;
+    url.search = "";
+  }
   url.searchParams.set("utm_source", "telegram");
   url.searchParams.set("utm_medium", "bot");
   url.searchParams.set("utm_campaign", "juyu_domain_check");
