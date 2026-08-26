@@ -103,6 +103,60 @@ describe("Supabase report persistence", () => {
     await expect(backend.getUserSource(123)).resolves.toBe("referral");
   });
 
+  it("stores a readable last-source label for a returning user", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ telegram_user_id: 123 }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    await backend.identifyUser(123, "direct");
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      last_source: "direct",
+      last_source_label: "直接打开 Telegram Bot",
+    });
+  });
+
+  it("keeps user tracking working before the source-label migration is applied", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ telegram_user_id: 123 }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response("missing column", { status: 400 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    await expect(backend.identifyUser(123, "direct")).resolves.toEqual({ isNew: false });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toMatchObject({ last_source: "direct" });
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).not.toHaveProperty("last_source_label");
+  });
+
   it("deduplicates recent reports by domain", async () => {
     const report = (domain: string, checkedAt: string) => ({
       domain,

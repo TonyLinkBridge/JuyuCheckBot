@@ -32,6 +32,7 @@ import { GrowthAreaChart } from "@/components/tremor/growth-area-chart";
 import { SourceBarChart } from "@/components/tremor/source-bar-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { rangeOptions, type DashboardData, type Metric } from "@/lib/dashboard-data";
+import { sourceLabel } from "@/lib/source-label";
 import { cn } from "@/lib/utils";
 
 const metricDefinitions = [
@@ -320,7 +321,7 @@ function SourceTable({ sources }: { sources: DashboardData["sources"] }) {
           <tbody>
             {sources.length ? sources.map((source) => (
               <tr key={source.source}>
-                <td><span className="source-name">{source.source}</span></td><td>{source.newUsers}</td><td>{source.activated}</td><td>{source.unlocked}</td><td>{source.shared}</td><td>{formatPercent(source.activationRate)}</td>
+                <td><SourceDisplay source={source.source} /></td><td>{source.newUsers}</td><td>{source.activated}</td><td>{source.unlocked}</td><td>{source.shared}</td><td>{formatPercent(source.activationRate)}</td>
               </tr>
             )) : <tr><td colSpan={6} className="empty-cell">等待首批来源数据</td></tr>}
           </tbody>
@@ -410,7 +411,7 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
                 <td>{lead.intent === "buyer" ? "想购买" : "想出售"}</td>
                 <td>{leadActionLabel(lead.action)}</td>
                 <td>{lead.evidenceAvailable === null || lead.evidenceTotal === null ? registrationStatusLabel(lead.registrationStatus) : `${lead.evidenceAvailable}/${lead.evidenceTotal} · ${registrationStatusLabel(lead.registrationStatus)}`}</td>
-                <td><Badge>{lead.source}</Badge></td>
+                <td><Badge title={lead.source}>{sourceLabel(lead.source)}</Badge></td>
                 <td><span className={cn("lead-status", lead.handedOff && "handed-off", lead.submitted && "submitted")}><i />{lead.submitted ? leadStatusLabel(lead.leadStatus) : lead.handedOff ? "已进入助手" : "待行动"}</span></td>
               </tr>) : <tr><td colSpan={7} className="empty-cell">用户选择购买或出售意图后显示</td></tr>}</tbody>
             </table>
@@ -420,7 +421,7 @@ function LeadConversion({ leads }: { leads: DashboardData["leads"] }) {
           <CardHeader><div><p className="card-kicker">LEAD SOURCES</p><h2>客户来源 <small>Commercial attribution</small></h2></div><Fingerprint size={18} className="muted-icon" aria-hidden="true" /></CardHeader>
           <CardContent className="table-wrap">
             <table><thead><tr><th>来源</th><th>意向</th><th>导流</th><th>提交</th><th>完成率</th></tr></thead><tbody>
-              {leads.sources.length ? leads.sources.map((source) => <tr key={source.source}><td><span className="source-name">{source.source}</span></td><td>{source.intents}</td><td>{source.handoffs}</td><td>{source.submitted}</td><td>{formatPercent(source.completionRate)}</td></tr>) : <tr><td colSpan={5} className="empty-cell">等待商业意向数据</td></tr>}
+              {leads.sources.length ? leads.sources.map((source) => <tr key={source.source}><td><SourceDisplay source={source.source} /></td><td>{source.intents}</td><td>{source.handoffs}</td><td>{source.submitted}</td><td>{formatPercent(source.completionRate)}</td></tr>) : <tr><td colSpan={5} className="empty-cell">等待商业意向数据</td></tr>}
             </tbody></table>
           </CardContent>
         </Card>
@@ -454,7 +455,7 @@ function QualityHealth({ quality }: { quality: DashboardData["quality"] }) {
 function ActivityTable({ events }: { events: DashboardData["recent"] }) {
   return (
     <Card className="activity-card"><CardContent className="table-wrap"><table><thead><tr><th>事件</th><th>域名</th><th>来源</th><th>时间</th></tr></thead><tbody>
-      {events.length ? events.map((event, index) => <tr key={`${event.event}-${event.createdAt}-${index}`}><td><span className={cn("event-dot", event.event === "check_failed" && "event-error")} />{eventLabels[event.event] ?? event.event}</td><td className="domain-cell">{event.domain ?? "—"}</td><td><Badge>{event.source}</Badge></td><td className="time-cell">{formatTime(event.createdAt)}</td></tr>) : <tr><td colSpan={4} className="empty-cell">暂无活动</td></tr>}
+      {events.length ? events.map((event, index) => <tr key={`${event.event}-${event.createdAt}-${index}`}><td><span className={cn("event-dot", event.event === "check_failed" && "event-error")} />{eventLabels[event.event] ?? event.event}</td><td className="domain-cell">{event.domain ?? "—"}</td><td><Badge title={event.source}>{sourceLabel(event.source)}</Badge></td><td className="time-cell">{formatTime(event.createdAt)}</td></tr>) : <tr><td colSpan={4} className="empty-cell">暂无活动</td></tr>}
     </tbody></table></CardContent></Card>
   );
 }
@@ -485,6 +486,10 @@ function formatMetric(metric: Metric): string {
   if (metric.format === "percent") return formatPercent(metric.value);
   if (metric.format === "decimal") return metric.value.toFixed(1);
   return new Intl.NumberFormat("en-US").format(metric.value);
+}
+
+function SourceDisplay({ source }: { source: string }) {
+  return <span className="source-display"><span>{sourceLabel(source)}</span><code>{source}</code></span>;
 }
 
 function formatPercent(value: number): string { return `${(value * 100).toFixed(value > 0 && value < 0.1 ? 1 : 0)}%`; }

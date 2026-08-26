@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { DashboardData } from "@/lib/dashboard-data";
+import { sourceLabel, sourceShortLabel } from "@/lib/source-label";
 
 export function SourceBarChart({ data }: { data: DashboardData["sources"] }) {
   if (!data.length) return <div className="compact-empty">暂无来源数据</div>;
@@ -10,9 +11,10 @@ export function SourceBarChart({ data }: { data: DashboardData["sources"] }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data.slice(0, 6)} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
           <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="source" axisLine={false} tickLine={false} tick={{ fill: "var(--text-soft)", fontSize: 10 }} />
+          <XAxis dataKey="source" tickFormatter={sourceShortLabel} axisLine={false} tickLine={false} tick={{ fill: "var(--text-soft)", fontSize: 10 }} />
           <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "var(--text-soft)", fontSize: 10 }} />
           <Tooltip
+            labelFormatter={(value) => sourceLabel(String(value))}
             cursor={{ fill: "var(--row-hover)" }}
             contentStyle={{ background: "var(--tooltip)", border: "1px solid var(--border)", borderRadius: 9, fontSize: 12, color: "var(--text-medium)" }}
           />

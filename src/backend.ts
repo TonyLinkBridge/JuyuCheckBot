@@ -2,6 +2,7 @@ import type { Config } from "./config.js";
 import { buildEvidence } from "./domain/evidence.js";
 import { emptyIntelligence } from "./domain/intelligence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
+import { sourceLabel } from "./source-label.js";
 
 export type GrowthEventName =
   | "bot_started"
@@ -149,25 +150,41 @@ class SupabaseBackend implements Backend {
     const now = new Date().toISOString();
 
     if (rows?.length) {
-      await this.write("PATCH", `user_profiles?telegram_user_id=eq.${telegramUserId}`, {
+      const path = `user_profiles?telegram_user_id=eq.${telegramUserId}`;
+      const updated = await this.write("PATCH", path, {
         last_source: source,
+        last_source_label: sourceLabel(source),
         last_seen_at: now,
       });
+      if (!updated) {
+        await this.write("PATCH", path, {
+          last_source: source,
+          last_seen_at: now,
+        });
+      }
       return { isNew: false };
     }
 
-    const inserted = await this.write(
+    const path = "user_profiles?on_conflict=telegram_user_id";
+    const profile = {
+      telegram_user_id: telegramUserId,
+      first_source: source,
+      last_source: source,
+      first_seen_at: now,
+      last_seen_at: now,
+    };
+    let inserted = await this.write(
       "POST",
-      "user_profiles?on_conflict=telegram_user_id",
+      path,
       {
-        telegram_user_id: telegramUserId,
-        first_source: source,
-        last_source: source,
-        first_seen_at: now,
-        last_seen_at: now,
+        ...profile,
+        last_source_label: sourceLabel(source),
       },
       "resolution=ignore-duplicates,return=minimal",
     );
+    if (!inserted) {
+      inserted = await this.write("POST", path, profile, "resolution=ignore-duplicates,return=minimal");
+    }
     return { isNew: inserted };
   }
 
