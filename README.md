@@ -66,8 +66,8 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    ```text
    BOT_TOKEN
    BOT_USERNAME=JuyuCheckBot
-   CHANNEL_USERNAME=juyuofficial
-   CHANNEL_URL=https://t.me/juyuofficial
+   CHANNEL_USERNAME=JUYU007
+   CHANNEL_URL=https://t.me/JUYU007
    CHANNEL_NAME=JUYU 聚域｜域名情报局
    COMMERCE_BOT_USERNAME=JuyuDomainBot
    JUCHA_URL=https://www.jucha.com/juhe/
