@@ -1,4 +1,5 @@
 import type { RdapResult } from "./types.js";
+import { checkWhoisRegistration } from "./whois.js";
 
 type RdapEvent = { eventAction?: string; eventDate?: string };
 type RdapEntity = {
@@ -38,7 +39,11 @@ export async function checkRegistration(
     if (!privateRegistrySuffixes.has(publicSuffix)) return unknownRdap();
     return checkTechEdgeWhois(domain, publicSuffix, timeoutMs);
   }
-  return checkRdap(domain, timeoutMs);
+  try {
+    return await checkRdap(domain, timeoutMs);
+  } catch {
+    return checkWhoisRegistration(domain, timeoutMs);
+  }
 }
 
 export async function checkRdap(domain: string, timeoutMs: number): Promise<RdapResult> {

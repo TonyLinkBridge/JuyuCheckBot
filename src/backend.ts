@@ -583,7 +583,7 @@ function stringArray(value: unknown): string[] {
 }
 
 function isRegistrationSourceType(value: unknown): value is DomainReport["rdap"]["source"]["type"] {
-  return value === "rdap" || value === "registry-whois" || value === "unavailable";
+  return value === "rdap" || value === "registry-whois" || value === "whois" || value === "unavailable";
 }
 
 function externalStatus(value: unknown): DomainReport["intelligence"]["tranco"]["status"] {

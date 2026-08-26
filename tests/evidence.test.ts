@@ -41,7 +41,8 @@ describe("evidence report", () => {
       now: new Date("2026-08-17T00:00:00Z"),
     });
 
-    expect(result.reportVersion).toBe(REPORT_VERSION);
+    expect(result.reportVersion).toBe("JUYU-EVIDENCE-3.2");
+    expect(REPORT_VERSION).toBe("JUYU-EVIDENCE-3.2");
     expect(result.evidenceItems.filter((item) => item.available)).toHaveLength(7);
     expect(result.dataCoverage).toBe(100);
     expect(result.alerts).toEqual([]);
@@ -82,5 +83,41 @@ describe("evidence report", () => {
 
     expect(result.summary).toContain("无法确认注册记录");
     expect(result.alerts).toContain("注册状态暂时无法从可用资料源确认");
+  });
+
+  it("warns when an EPP hold status suspends normal resolution", () => {
+    const result = buildEvidence({
+      domain: "example.com",
+      registrableDomain: "example.com",
+      isIdn: false,
+      rdap: { ...rdap, statuses: ["clientHold"] },
+      dns,
+    });
+
+    expect(result.alerts).toContain("域名状态显示暂停解析，需到注册商或注册局核实原因");
+  });
+
+  it("warns when an EPP status shows redemption or pending deletion", () => {
+    const result = buildEvidence({
+      domain: "example.com",
+      registrableDomain: "example.com",
+      isIdn: false,
+      rdap: { ...rdap, statuses: ["pendingDelete"] },
+      dns,
+    });
+
+    expect(result.alerts).toContain("域名处于赎回或待删除流程，状态可能快速变化");
+  });
+
+  it("does not treat an ordinary transfer lock as a risk alert", () => {
+    const result = buildEvidence({
+      domain: "example.com",
+      registrableDomain: "example.com",
+      isIdn: false,
+      rdap: { ...rdap, statuses: ["clientTransferProhibited"] },
+      dns,
+    });
+
+    expect(result.alerts).toEqual([]);
   });
 });

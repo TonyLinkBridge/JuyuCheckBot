@@ -12,10 +12,10 @@ export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
 直接发送域名，免费查看：
 ✓ 注册状态、域龄与 DNS 概况
-✓ 一项可验证的公开网站信号
+✓ 到期时间、资料来源与取得时间
 ✓ 基础警报与下一步方向
 
-完整历史、风险、备案与 SEO 查询会引导到聚查；
+完整历史、风险、备案与网站数据会引导到聚查；
 明确的购买或出售需求会进入 JUYU 聚域助手。
 
 直接发送一个域名，例如：
@@ -36,7 +36,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费 Preview 会先显示注册状态、域龄、DNS、一个公开信号和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、风险、备案或 SEO 资料时进入聚查，准备购买或出售时进入 JUYU 聚域助手。
+免费初检会先显示注册状态、域龄、到期时间、DNS、资料来源和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、备案、中国商标、国内平台风险或网站数据时进入聚查，准备购买或出售时进入 JUYU 聚域助手。
 
 常用命令：
 /recent 最近体检
@@ -45,19 +45,22 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 <i>结果仅供初步筛查，不替代商标、法律、安全、估值或交易尽调。</i>`;
 
 export function checkingText(domain: string): string {
-  return `🔍 正在查询 <b>${escapeHtml(domain)}</b> 的权威资料与第三方公开信号…`;
+  return `🔍 正在查询 <b>${escapeHtml(domain)}</b> 的注册资料与 DNS…`;
 }
 
 export function previewReportText(report: DomainReport): string {
-  return `✅ <b>JUYU DOMAIN CHECK</b>
+  return `✅ <b>JUYU 域名初检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
-注册资料　${registrationStatusLine(report.rdap.status)}
+注册状态　${registrationStatusLine(report.rdap.status)}
 域名年龄　${report.ageYears === null ? "○ 暂未取得" : `<b>${formatYears(report.ageYears)} 年</b>`}
-DNS　　　${dnsStatusLine(report)}
-网站信号　${previewSignalLine(report)}
-值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
+到期时间　${formatDate(report.rdap.expiresAt)}
+DNS 状态　${dnsStatusLine(report)}
+基础提醒　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
+
+资料来源　${registrationSource(report)}
+取得时间　${formatDateTime(report.rdap.source.checkedAt)}
 
 ━━━━━━━━━━━━━━
 <b>快速结论</b>
@@ -89,7 +92,7 @@ export function gateText(config: Config): string {
 ✓ 需要继续核查的重点
 ✓ 根据买家 / 持有人 / 研究目的给出下一步
 
-完整历史、备案、黑名单、平台风险、SEO 与价格资料，需前往聚查继续查询。
+完整历史、ICP 备案、中国商标、国内平台风险、网站与价格资料，需前往聚查继续查询。
 
 免费订阅
 <b>${escapeHtml(config.CHANNEL_NAME)}</b>
@@ -104,7 +107,7 @@ export function gateKeyboard(config: Config, token: string, intent: DomainIntent
 }
 
 export function fullReportText(report: DomainReport, intent: DomainIntent): string {
-  const evidenceItems = decisionEvidence(report).slice(0, 3);
+  const evidenceItems = decisionEvidence(report).slice(0, 4);
   const attentionItems = decisionAttention(report);
   const evidence = evidenceItems.map((item) => `• ${escapeHtml(item)}`).join("\n");
   const attention = attentionItems.slice(0, 2).map((item) => `• ${escapeHtml(item)}`).join("\n");
@@ -120,7 +123,7 @@ export function fullReportText(report: DomainReport, intent: DomainIntent): stri
 ${escapeHtml(decisionConclusion(report, intent))}
 
 ━━━━━━━━━━━━━━
-✅ <b>为什么这样判断</b>
+✅ <b>本次已确认</b>
 
 ${evidence}
 
@@ -134,10 +137,14 @@ ${attention}${remainingAttention ? `\n• 另有 ${remainingAttention} 项建议
 ${escapeHtml(actionAdvice(report, intent))}
 
 ━━━━━━━━━━━━━━
-🔎 <b>完整查询在聚查</b>
+🔒 <b>聚查可继续查询</b>
 
-网站历史 · 历史 WHOIS · ICP 备案 · 黑名单
-平台风险 · SEO 数据 · 历史价格 · 批量导出
+• 完整 WHOIS 与注册技术资料
+• 历史 WHOIS 与历史 DNS
+• ICP 备案与国内平台风险
+• 中国商标与品牌近似检索
+• 网站与搜索表现
+• 历史价格与市场资料
 
 <i>${escapeHtml(report.reportVersion)} · ${formatDateTime(report.checkedAt)}
 Bot 只提供初筛摘要，不代替聚查完整查询、估值、商标、法律或交易尽调。</i>`;
@@ -162,7 +169,7 @@ export function technicalReportText(report: DomainReport): string {
 资料来源：${registrationSource(report)}
 
 ━━━━━━━━━━━━━━
-📋 <b>DATA｜可验证数据</b>
+📋 <b>可验证数据</b>
 • 注册状态：${registrationLabel(report.rdap.status)}
 • 注册商：${registrar}
 • 注册日期：${formatDate(report.rdap.createdAt)}
@@ -175,8 +182,8 @@ export function technicalReportText(report: DomainReport): string {
 <b>DNS 明细</b>
 • A：${formatValues(report.dns.ipv4)}
 • AAAA：${formatValues(report.dns.ipv6)}
-• Registry NS：${formatValues(report.rdap.nameServers)}
-• DNS NS：${formatValues(report.dns.nameServers)}
+• 注册资料域名服务器（NS）：${formatValues(report.rdap.nameServers)}
+• DNS 域名服务器（NS）：${formatValues(report.dns.nameServers)}
 • MX：${formatValues(report.dns.mx.map((item) => `${item.priority} ${item.exchange}`))}
 
 <b>资料出处</b>
@@ -190,11 +197,7 @@ export function technicalReportText(report: DomainReport): string {
 ${evidenceLines}
 
 ━━━━━━━━━━━━━━
-🌍 <b>WEB INTELLIGENCE｜第三方真实指标</b>
-${externalIntelligenceText(report)}
-
-━━━━━━━━━━━━━━
-🔎 <b>STRUCTURE｜名称结构事实</b>
+🔎 <b>名称结构事实</b>
 ${structureLines}
 
 <b>基础警报</b>
@@ -211,21 +214,24 @@ export function fullReportKeyboard(
   intent: DomainIntent,
   token: string,
 ): InlineKeyboard {
-  const keyboard = new InlineKeyboard();
+  const keyboard = new InlineKeyboard().url(
+    intent === "buyer"
+      ? "🔍 去聚查完成购买前尽调"
+      : intent === "owner"
+        ? "📊 去聚查查看完整域名资料"
+        : "🔓 去聚查查看完整资料",
+    juchaHandoffLink(config, report.domain, intent, token),
+  );
 
   if (intent === "owner") {
-    keyboard.text("💰 提交 JUYU 出售 / 深度评估", `lead:owner:${token}`);
+    keyboard.row().text("💰 提交 JUYU 出售 / 深度评估", `lead:owner:${token}`);
   } else if (intent === "buyer") {
     keyboard
+      .row()
       .text(
         report.rdap.status === "available" ? "🎯 委托 JUYU 协助注册" : "🤝 委托 JUYU 协助收购",
         `lead:buyer:${token}`,
       );
-  } else {
-    keyboard.url("🔓 去聚查查看完整尽调", juchaHandoffLink(config, report.domain, intent, token));
-  }
-  if (intent !== "research") {
-    keyboard.row().url("🔎 去聚查查看完整资料", juchaHandoffLink(config, report.domain, intent, token));
   }
   keyboard.row().text("📤 生成分享卡", `share:${intent}:${token}`);
   keyboard.row().text("🔄 重新实时检查", `refresh:${token}`);
@@ -235,7 +241,7 @@ export function fullReportKeyboard(
 
 export function technicalReportKeyboard(token: string): InlineKeyboard {
   return new InlineKeyboard()
-    .url("®️ WIPO 官方商标查询", "https://branddb.wipo.int/")
+    .url("®️ 中国商标官方查询", "https://sbj.cnipa.gov.cn/sbj/sbcx/")
     .row()
     .text("🔄 重新实时检查", `refresh:${token}`)
     .row()
@@ -243,17 +249,17 @@ export function technicalReportKeyboard(token: string): InlineKeyboard {
 }
 
 export function shareCardText(report: DomainReport): string {
-  return `📤 <b>JUYU DOMAIN CHECK</b>
+  return `📤 <b>JUYU 域名初检</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
 💡 <b>${escapeHtml(decisionConclusion(report, "research"))}</b>
 
 ━━━━━━━━━━━━━━
-✅ <b>可验证信号</b>
+✅ <b>已确认资料</b>
 ${shareSignalLines(report)}
 
-资料覆盖　基础 ${evidenceCount(report)} · 第三方 ${externalEvidenceCount(report)}
+资料覆盖　基础 ${evidenceCount(report)}
 值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
 
 ━━━━━━━━━━━━━━
@@ -302,10 +308,10 @@ export function referralWelcomeText(report: DomainReport): string {
 
 💡 <b>${escapeHtml(decisionConclusion(report, "research"))}</b>
 
-✅ <b>可验证信号</b>
+✅ <b>已确认资料</b>
 ${shareSignalLines(report)}
 
-资料覆盖　基础 ${evidenceCount(report)} · 第三方 ${externalEvidenceCount(report)}
+资料覆盖　基础 ${evidenceCount(report)}
 值得注意　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
 
 ━━━━━━━━━━━━━━
@@ -420,8 +426,8 @@ function actionAdvice(report: DomainReport, intent: DomainIntent): string {
     if (report.rdap.status === "available") {
       return "注册资料源暂未发现记录。先在注册商实时复核并检查商标；确认无误后，可交给 JUYU 协助注册或寻找更合适的替代域名。";
     }
-    if (hasActiveWebsiteSignals(report)) {
-      return "这个域名正在持续使用，不能把到期日当成即将释放的承诺。如果你确实需要它，下一步应核对商标、收购可行性与替代方案，再交给 JUYU 协助接触持有人。";
+    if (report.dns.resolves) {
+      return "这个域名已注册且 DNS 正常解析，不能把到期日当成即将释放的承诺。如果你确实需要它，下一步应核对商标、收购可行性与替代方案，再交给 JUYU 协助接触持有人。";
     }
     return "这个域名已经注册，但公开资料不足以判断持有人是否愿意出售。下一步应先做历史与商标核查，再由 JUYU 评估收购或替代域名方案。";
   }
@@ -436,18 +442,18 @@ function decisionConclusion(report: DomainReport, intent: DomainIntent): string 
     return "权威注册资料暂未发现记录，但正式注册前仍需实时复核可用性与商标风险。";
   }
   if (intent === "buyer") {
-    return hasActiveWebsiteSignals(report)
-      ? "这是一个已经注册且持续使用的域名，不是普通注册渠道可以直接取得的候选。"
-      : "这个域名已经注册，但现有公开资料不足以判断它是否正在积极使用或愿意出售。";
+    return report.dns.resolves
+      ? "这是一个已经注册且 DNS 正常解析的域名，不能通过普通注册渠道直接取得。"
+      : "这个域名已经注册，但现有公开资料不足以判断它是否正在使用或愿意出售。";
   }
   if (intent === "owner") {
-    return hasActiveWebsiteSignals(report)
-      ? "这个域名具备持续使用和第三方网站信号，但这些信号不能直接等同于出售价格。"
-      : "已确认域名注册资料；目前公开网站信号有限，商业价值仍需结合买家需求和使用场景判断。";
+    return report.dns.resolves
+      ? "已确认这个域名的注册资料与 DNS 状态，但这些技术事实不能直接等同于出售价格。"
+      : "已确认域名注册资料；商业价值仍需结合买家需求、使用场景与市场资料判断。";
   }
-  return hasActiveWebsiteSignals(report)
-    ? "这是一个已注册并持续使用的成熟网站型域名，公开资料可以验证其网站与链接信号。"
-    : "已确认域名注册资料，但现有网站和市场资料有限，暂时不适合下商业价值结论。";
+  return report.dns.resolves
+    ? "已确认域名注册资料与 DNS 状态；商业价值仍需结合历史、商标与市场资料判断。"
+    : "已确认域名注册资料，但现有资料不足以判断商业价值。";
 }
 
 function decisionEvidence(report: DomainReport): string[] {
@@ -467,57 +473,18 @@ function decisionEvidence(report: DomainReport): string[] {
     items.push(report.dns.resolves ? `DNS 正常解析${mail}` : "本次未发现有效 DNS 解析");
   }
 
-  const tranco = report.intelligence.tranco;
-  if (tranco.status === "available" && tranco.rank !== null) {
-    items.push(`Tranco 全球排名 #${formatInteger(tranco.rank)}${tranco.rankedAt ? `（${tranco.rankedAt}）` : ""}`);
-  }
-  const ahrefs = report.intelligence.ahrefs;
-  if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
-    items.push(`Domain Rating by Ahrefs：${formatDecimal(ahrefs.domainRating)} / 100`);
-  }
-  const crux = report.intelligence.crux;
-  if (crux.status === "available") {
-    const values = [
-      crux.lcpP75Ms === null ? null : `LCP ${formatInteger(crux.lcpP75Ms)} ms`,
-      crux.inpP75Ms === null ? null : `INP ${formatInteger(crux.inpP75Ms)} ms`,
-      crux.clsP75 === null ? null : `CLS ${crux.clsP75.toFixed(3)}`,
-    ].filter((value): value is string => value !== null);
-    if (values.length) items.push(`Google 真实用户 p75：${values.join("、")}`);
-  }
+  if (report.rdap.dnssec !== null) items.push(`DNSSEC：${report.rdap.dnssec ? "已启用" : "未启用"}`);
   return items.length ? items : ["本次没有取得足够的可验证资料"];
 }
 
 function decisionAttention(report: DomainReport): string[] {
   const items = [...report.alerts];
-  const crux = report.intelligence.crux;
-  if (crux.status === "available") {
-    if (crux.lcpP75Ms !== null && crux.lcpP75Ms > 2500) {
-      items.push(`Google LCP ${formatInteger(crux.lcpP75Ms)} ms，页面主要内容加载速度需要改善`);
-    }
-    if (crux.inpP75Ms !== null && crux.inpP75Ms > 200) {
-      items.push(`Google INP ${formatInteger(crux.inpP75Ms)} ms，互动响应速度需要改善`);
-    }
-    if (crux.clsP75 !== null && crux.clsP75 > 0.1) {
-      items.push(`Google CLS ${crux.clsP75.toFixed(3)}，页面视觉稳定性需要改善`);
-    }
-  }
   if (report.rdap.dnssec === false) {
     items.push("注册资料显示 DNSSEC 未启用；这不代表网站一定不安全，但属于可进一步核对的 DNS 防护项");
-  }
-  if (report.intelligence.wayback.status !== "available") {
-    items.push("网站历史快照本次未取得，不能据此判断这个域名没有历史内容");
   }
   return [...new Set(items)].length
     ? [...new Set(items)]
     : ["本次可用资料未发现明确警报；仍需按实际用途进行商标、内容与交易核查"];
-}
-
-function hasActiveWebsiteSignals(report: DomainReport): boolean {
-  return report.dns.resolves && (
-    report.intelligence.tranco.status === "available" ||
-    report.intelligence.crux.status === "available" ||
-    (report.intelligence.ahrefs.status === "available" && (report.intelligence.ahrefs.domainRating ?? 0) >= 20)
-  );
 }
 
 function shareSignalLines(report: DomainReport): string {
@@ -531,46 +498,14 @@ function shareSignalLines(report: DomainReport): string {
   }
   if (report.dns.checked) items.push(`DNS：${report.dns.resolves ? "正常解析" : "未发现有效解析"}`);
 
-  const tranco = report.intelligence.tranco;
-  if (tranco.status === "available" && tranco.rank !== null) {
-    items.push(`Tranco 全球排名：#${formatInteger(tranco.rank)}`);
-  }
-  const ahrefs = report.intelligence.ahrefs;
-  if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
-    items.push(`Domain Rating by Ahrefs：${formatDecimal(ahrefs.domainRating)} / 100`);
-  }
-  const crux = report.intelligence.crux;
-  if (crux.status === "available") {
-    const ratings = [
-      crux.lcpP75Ms === null ? null : `LCP ${metricRating(crux.lcpP75Ms, 2500, 4000)}`,
-      crux.inpP75Ms === null ? null : `INP ${metricRating(crux.inpP75Ms, 200, 500)}`,
-      crux.clsP75 === null ? null : `CLS ${metricRating(crux.clsP75, 0.1, 0.25)}`,
-    ].filter((value): value is string => value !== null);
-    if (ratings.length) items.push(`Google CrUX：${ratings.join(" · ")}`);
-  }
+  if (report.rdap.expiresAt) items.push(`到期时间：${formatDate(report.rdap.expiresAt)}`);
   return items.slice(0, 3).map((item) => `• ${escapeHtml(item)}`).join("\n");
-}
-
-function previewSignalLine(report: DomainReport): string {
-  const tranco = report.intelligence.tranco;
-  if (tranco.status === "available" && tranco.rank !== null) {
-    return escapeHtml(`Tranco #${formatInteger(tranco.rank)}`);
-  }
-  const ahrefs = report.intelligence.ahrefs;
-  if (ahrefs.status === "available" && ahrefs.domainRating !== null) {
-    return escapeHtml(`Ahrefs DR ${formatDecimal(ahrefs.domainRating)}`);
-  }
-  if (report.intelligence.crux.status === "available") return "Google CrUX 已收录";
-  return "本次未取得公开网站信号";
 }
 
 function shareAttentionCount(report: DomainReport): number {
   return decisionAttention(report).filter((item) => !item.startsWith("本次可用资料未发现明确警报")).length;
 }
 
-function metricRating(value: number, good: number, poor: number): string {
-  return value <= good ? "良好" : value <= poor ? "需要改善" : "较差";
-}
 
 function registrationLabel(status: RegistrationStatus): string {
   if (status === "registered") return "已注册";
@@ -582,15 +517,6 @@ function evidenceCount(report: DomainReport): string {
   return `${report.evidenceItems.filter((item) => item.available).length}/${report.evidenceItems.length} 项`;
 }
 
-function externalEvidenceCount(report: DomainReport): string {
-  const sources = [
-    report.intelligence.tranco,
-    report.intelligence.crux,
-    report.intelligence.ahrefs,
-    report.intelligence.wayback,
-  ];
-  return `${sources.filter((item) => item.status === "available").length}/${sources.length} 项`;
-}
 
 function registrationStatusLine(status: RegistrationStatus): string {
   if (status === "registered") return "✅ 已确认注册";
@@ -614,54 +540,6 @@ function registrationSource(report: DomainReport): string {
   return report.rdap.source.url
     ? `<a href="${escapeHtml(report.rdap.source.url)}">${name}</a>`
     : name;
-}
-
-function externalIntelligenceText(report: DomainReport): string {
-  const tranco = report.intelligence.tranco.status === "available" && report.intelligence.tranco.rank !== null
-    ? `• Tranco 全球排名：<b>#${formatInteger(report.intelligence.tranco.rank)}</b>${report.intelligence.tranco.rankedAt ? `（${escapeHtml(report.intelligence.tranco.rankedAt)}）` : ""}\n  <a href="https://tranco-list.eu/">来源：Tranco</a>`
-    : `• Tranco 全球排名：${externalStatusLabel(report.intelligence.tranco.status, "未进入最近的 Top 1,000,000")}`;
-
-  const crux = report.intelligence.crux;
-  const cruxLine = crux.status === "available"
-    ? `• Chrome UX Report（Google 真实用户 p75）\n  LCP：${formatCruxValue(crux.lcpP75Ms, "ms", 2500, 4000)}\n  INP：${formatCruxValue(crux.inpP75Ms, "ms", 200, 500)}\n  CLS：${formatCruxValue(crux.clsP75, "", 0.1, 0.25)}${crux.periodStart && crux.periodEnd ? `\n  数据期：${escapeHtml(crux.periodStart)} 至 ${escapeHtml(crux.periodEnd)}` : ""}\n  <a href="https://developer.chrome.com/docs/crux/">来源：Chrome UX Report</a>`
-    : `• Chrome UX Report：${externalStatusLabel(crux.status, "未达到 Google 的公开数据门槛")}`;
-
-  const ahrefs = report.intelligence.ahrefs.status === "available" && report.intelligence.ahrefs.domainRating !== null
-    ? `• Domain Rating by <a href="https://ahrefs.com/">Ahrefs</a>：<b>${formatDecimal(report.intelligence.ahrefs.domainRating)}</b> / 100`
-    : `• Ahrefs Domain Rating (DR)：${externalStatusLabel(report.intelligence.ahrefs.status, "未发现资料")}`;
-
-  const wayback = report.intelligence.wayback;
-  const waybackLine = wayback.status === "available"
-    ? `• Internet Archive 网站历史\n  最早快照：${linkedDate(wayback.firstCaptureAt, wayback.firstCaptureUrl)}\n  最近快照：${linkedDate(wayback.latestCaptureAt, wayback.latestCaptureUrl)}`
-    : `• Internet Archive 网站历史：${externalStatusLabel(wayback.status, "未发现公开快照")}`;
-
-  return [tranco, cruxLine, ahrefs, waybackLine].join("\n");
-}
-
-function externalStatusLabel(status: DomainReport["intelligence"]["tranco"]["status"], notFound: string): string {
-  if (status === "not_found") return notFound;
-  if (status === "not_configured") return "尚未启用免费 API Key";
-  return "本次资料源暂不可用";
-}
-
-function formatCruxValue(value: number | null, unit: "ms" | "", good: number, poor: number): string {
-  if (value === null) return "该指标无资料";
-  const display = unit === "ms" ? `${formatInteger(value)} ms` : value.toFixed(3);
-  const label = value <= good ? "良好" : value <= poor ? "需要改善" : "较差";
-  return `${display}（${label}）`;
-}
-
-function linkedDate(date: Date | null, url: string | null): string {
-  const label = formatDate(date);
-  return url ? `<a href="${escapeHtml(url)}">${label}</a>` : label;
-}
-
-function formatInteger(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
-}
-
-function formatDecimal(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
 }
 
 function formatValues(values: string[], limit = 4): string {

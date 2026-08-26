@@ -1,6 +1,6 @@
 {
   "name": "juyu-domain-check-bot",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "JUYU 域名体检 Telegram Growth Bot",
   "type": "module",
@@ -24,6 +24,7 @@
     "express": "^5.1.0",
     "grammy": "^1.38.2",
     "tldts": "^7.0.13",
+    "whoiser": "^2.0.0-beta.10",
     "zod": "^4.0.17"
   },
   "devDependencies": {

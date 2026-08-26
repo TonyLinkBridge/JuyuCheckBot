@@ -1,6 +1,6 @@
 export type RegistrationStatus = "registered" | "available" | "unknown";
 
-export type RegistrationSourceType = "rdap" | "registry-whois" | "unavailable";
+export type RegistrationSourceType = "rdap" | "registry-whois" | "whois" | "unavailable";
 
 export type RegistrationSource = {
   type: RegistrationSourceType;

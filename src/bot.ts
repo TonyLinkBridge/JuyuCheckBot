@@ -479,8 +479,6 @@ export function createBot(config: Config): Bot {
           ? Promise.resolve(cachedReport)
           : checkDomain(domain, {
               timeoutMs: config.CHECK_TIMEOUT_MS,
-              googleCruxApiKey: config.GOOGLE_CRUX_API_KEY,
-              ahrefsApiKey: config.AHREFS_API_KEY,
             }),
         submittedEvent,
       ]);

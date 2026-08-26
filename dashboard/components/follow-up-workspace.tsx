@@ -212,7 +212,7 @@ export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData
           <div className="ops-panel quality-explainer">
             <p>QUALITY STANDARD</p>
             <h2>只把可验证的数据展示给用户</h2>
-            <span>注册局资料、实时 DNS 与第三方公开指标分别标示来源；无法确认的项目不会包装成评分。</span>
+            <span>注册局 RDAP、辅助 WHOIS 与实时 DNS 分别标示来源；无法确认的项目不会包装成评分。</span>
           </div>
         </section> : null}
 

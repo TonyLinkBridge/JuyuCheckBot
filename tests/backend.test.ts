@@ -23,6 +23,11 @@ describe("Supabase report persistence", () => {
                 createdAt: "1995-08-14T04:00:00.000Z",
                 expiresAt: null,
                 updatedAt: null,
+                source: {
+                  type: "whois",
+                  name: "辅助 WHOIS · whois.example.test",
+                  authoritative: false,
+                },
               },
             },
           },
@@ -45,6 +50,11 @@ describe("Supabase report persistence", () => {
     expect(stored?.intent).toBe("buyer");
     expect(stored?.report.checkedAt).toBeInstanceOf(Date);
     expect(stored?.report.rdap.createdAt).toBeInstanceOf(Date);
+    expect(stored?.report.rdap.source).toMatchObject({
+      type: "whois",
+      name: "辅助 WHOIS · whois.example.test",
+      authoritative: false,
+    });
     expect(fetchMock.mock.calls[0]?.[0]).toContain("telegram_user_id=eq.123");
   });
 

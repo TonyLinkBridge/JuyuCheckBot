@@ -1,7 +1,7 @@
 import "server-only";
 import { buildFollowUpInbox, type FollowUpEvent, type FollowUpInbox, type FollowUpProfile } from "@/lib/follow-up";
 
-const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.1";
+const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.2";
 
 export const rangeOptions = [
   { value: "1d", label: "24H", days: 1 },
@@ -350,7 +350,10 @@ function buildDashboard(
         currentEvidenceReports.length,
       ),
       registryFallbackRate: ratio(
-        currentEvidenceReports.filter((report) => registrationSource(report.report) === "registry-whois").length,
+        currentEvidenceReports.filter((report) => {
+          const source = registrationSource(report.report);
+          return source === "registry-whois" || source === "whois";
+        }).length,
         currentEvidenceReports.length,
       ),
       registrationUnknownRate: ratio(

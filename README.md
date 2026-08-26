@@ -1,6 +1,6 @@
 # 🔍 JUYU 域名体检
 
-`JUYU Domain Check` 是一个独立的 Telegram Growth Bot。用户发送域名后先获得可信 Preview，订阅 **JUYU 聚域｜域名情报局** 后解锁进阶摘要；普通查询进入聚查完成注册、充值与查询消费，明确买卖需求进入 `@JuyuDomainBot`。
+`JUYU Domain Check` 是一个面向亚洲与中文用户的 Telegram Growth Bot。用户发送域名后先获得可信初检，订阅 **JUYU 聚域｜域名情报局** 后解锁进阶摘要；完整历史、备案、商标、平台风险与网站资料进入聚查查询，明确买卖需求进入 `@JuyuDomainBot`。
 
 正式 Bot 用户名：`@JuyuCheckBot`。
 
@@ -18,11 +18,11 @@
 
 - 极简 `/start` 首屏和域名输入识别（支持 URL、子域名、中文 IDN）
 - 通过 IANA Bootstrap 直达权威注册局 RDAP，并进行原生 DNS 检查，不使用演示数据
-- `JUYU-EVIDENCE-3.1` 决策型证据报告：先说明结论、依据、注意事项与 JUYU 下一步，原始 DNS 和来源资料按需展开，不提供自创总分
-- 免费第三方事实层：Tranco 全球排名、Internet Archive 网站历史，以及配置免费 Key 后的 Chrome UX Report 与 Ahrefs Domain Rating
-- ICANN 域名使用 RDAP；`eu.cc` 等 TechEdge 私有注册后缀自动回退对应 Registry WHOIS
+- `JUYU-EVIDENCE-3.2` 中文市场决策型证据报告：先说明结论、已确认资料、注意事项、聚查可继续查询的目录与 JUYU 下一步，不提供自创总分
+- 免费事实层只保留全球通用的注册与技术资料：权威 RDAP、辅助 WHOIS、DNS、DNSSEC、域龄、到期时间与 EPP 状态
+- ICANN 域名使用 RDAP；RDAP 失败后自动回退通用 WHOIS；`eu.cc` 等 TechEdge 私有注册后缀使用对应 Registry WHOIS
 - Preview → 意图 → Growth Gate → `结论 / 关键依据 / 注意事项 / JUYU 建议` 进阶摘要
-- Value-first 首屏与 Preview：订阅前先显示注册、DNS、Tranco / Ahrefs / CrUX 公开信号、资料覆盖与快速结论，再询问用户目的
+- Value-first 首屏与初检：订阅前先显示注册状态、域龄、到期时间、DNS、资料来源、取得时间与快速结论，再询问用户目的
 - `getChatMember` 频道订阅验证和进阶摘要 Growth Gate
 - 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
@@ -35,7 +35,7 @@
 - Jucha Conversion Loop：聚查按钮经 `/go/jucha` 记录真实点击，再携带域名与 UTM 参数进入聚查综合查询
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
-- 对 RDAP、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
+- 对 RDAP、辅助 WHOIS、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
 - 推荐打开按独立用户计数，最近报告按域名去重
 - 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与逐注册资料源健康监控
 - Dashboard Poll 引流发布器：测试/正式频道双目标、服务器端 Token、正式发布确认与 `src_` Campaign 自动归因
@@ -74,8 +74,6 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    WEBHOOK_URL=https://你的稳定正式域名
    WEBHOOK_SECRET=至少16位、只含 A-Z a-z 0-9 _ - 的随机字符串
    CHECK_TIMEOUT_MS=8000
-   GOOGLE_CRUX_API_KEY=可选的免费_Google_API_Key
-   AHREFS_API_KEY=可选的免费_Ahrefs_API_Key
    SUPABASE_URL
    SUPABASE_SERVICE_ROLE_KEY
    ```
@@ -85,7 +83,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.15.0", "reportVersion": "JUYU-EVIDENCE-3.1" }
+   { "ok": true, "service": "juyu-domain-check", "version": "0.16.0", "reportVersion": "JUYU-EVIDENCE-3.2", "dataPolicy": "registry-and-dns" }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：
@@ -159,19 +157,13 @@ npm run dashboard:dev
 
 ## Evidence Report 边界
 
-`JUYU-EVIDENCE-3.1` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。主报告根据买家、持有人或研究者身份，先输出一句话结论、证据、注意事项与 JUYU 行动建议；原始 DNS、来源时间和结构事实通过二级技术资料页查看。普通域名按照 IETF RDAP Bootstrap 标准读取 IANA 路由表并访问权威注册局。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。
+`JUYU-EVIDENCE-3.2` 已移除 JUYU Structure Score、S/A/B 等级和数值化品牌判断。主报告根据买家、持有人或研究者身份，先输出一句话结论、Bot 本次已确认的注册/DNS 事实、注意事项、聚查可继续查询的资料目录与 JUYU 行动建议。普通域名按照 IETF RDAP Bootstrap 标准访问权威注册局；RDAP 失败时使用通用 WHOIS 作为明确标注的非权威辅助来源。对于 Public Suffix List 标记的私有注册后缀，Bot 只在有明确注册局适配器时判断“已注册/未发现记录”；没有可靠来源时显示“暂时无法确认”。
 
-第三方资料严格按来源原名显示：Tranco 排名不换算成 JUYU 分数；Chrome UX Report 显示 Google 汇总的真实 Chrome 用户 p75 数据；Ahrefs 显示 `Domain Rating by Ahrefs` 并保留官方归属；Internet Archive 只显示可点击的公开快照日期。第三方没有收录、Key 未配置、请求失败会分别显示，彼此不混为“低分”。
+Bot 定位为亚洲与中文市场的域名注册事实初筛，不再查询或展示 Tranco、Chrome UX Report、Ahrefs、Internet Archive 等偏欧美网站生态的指标。`DomainReport.intelligence` 只保留空的兼容结构，用于安全读取旧版 Supabase 报告，不会触发这些外部请求。
 
-WIPO Global Brand Database 禁止自动化抓取，因此 Bot 只提供官方查询按钮，不自动声称商标数量。Semrush Authority Score 和 Similarweb API 属于付费/额度制，本免费版本不接入。只有逐条记录域名、价格、日期与原始来源的已核验成交资料，未来才会显示；没有足够可比案例时不输出价格区间。报告仍不代表商标可用性、历史内容安全、SEO 信誉、市场需求、估值或交易合法性。
+ICP 备案、中国商标、国内平台风险、网站历史、搜索表现和历史价格等项目显示为“聚查可继续查询”，Bot 未取得时不会写成“已经找到”，也不会编造数量。只有逐条记录域名、价格、日期与原始来源的已核验成交资料，未来才会显示；没有足够可比案例时不输出价格区间。报告仍不代表商标可用性、历史内容安全、市场需求、估值或交易合法性。
 
-### 免费第三方 Key
-
-- Chrome UX Report：在 Google Cloud 启用 Chrome UX Report API 并创建 API Key，填入 `GOOGLE_CRUX_API_KEY`。API 免费；只有达到 Google 数据门槛的网站才有资料。
-- Ahrefs DR：注册免费 Ahrefs 账户，在 Account settings → API keys 建立 Key，填入 `AHREFS_API_KEY`。官方免费 DR endpoint 不消耗 API units，但要求显示 `Domain Rating by Ahrefs`。
-- Tranco 与 Internet Archive 不需要 Key。
-
-这些 Key 只放在 Vercel Production Environment Variables 和本地 `.env`，不要提交进 GitHub。
+通用 WHOIS 只提取域名、注册商、日期、域名服务器、EPP 状态与 DNSSEC，不保存原始 WHOIS，也不读取或保存注册人邮箱、电话等个人资料。只有明确的 Registry `not found` 回应才会显示“未发现注册记录”；模糊或异常回应一律显示“暂时无法确认”。
 
 ## Supabase 后端
 

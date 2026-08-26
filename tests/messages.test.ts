@@ -103,9 +103,12 @@ describe("referral growth messages", () => {
     const keyboard = shareCardKeyboard("token_123");
     const shareButton = keyboard.inline_keyboard[0]?.[0];
 
-    expect(text).toContain("可验证信号");
+    expect(text).toContain("已确认资料");
     expect(text).toContain("基础 7/7 项");
-    expect(text).toContain("Tranco 全球排名：#42");
+    expect(text).not.toContain("Tranco");
+    expect(text).not.toContain("CrUX");
+    expect(text).not.toContain("Ahrefs");
+    expect(text).not.toContain("Internet Archive");
     expect(text).not.toContain("Domain Rating by Ahrefs：93 / 100");
     expect(text).toContain("不做自创评分");
     expect(text).not.toContain("JUYU Score");
@@ -182,21 +185,25 @@ describe("commerce lead messages", () => {
     const buyerKeyboard = fullReportKeyboard(config, report, "buyer", "token_123");
     const researchKeyboard = fullReportKeyboard(config, report, "research", "token_123");
 
-    expect(ownerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:owner:token_123");
-    expect(buyerKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe("lead:buyer:token_123");
+    expect(ownerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
+    expect(buyerKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
+    expect(ownerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "lead:owner:token_123")).toBe(true);
+    expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "lead:buyer:token_123")).toBe(true);
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.url?.startsWith("https://www.jucha.com/juhe/"))).toBe(true);
     expect(researchKeyboard.inline_keyboard[0]?.[0]?.url).toContain("www.jucha.com/juhe/");
     expect(buyerKeyboard.inline_keyboard.flat().some((button) => button.callback_data === "refresh:token_123")).toBe(true);
   });
 
-  it("gives useful third-party signals before the subscription gate", () => {
+  it("gives a Chinese-first registration preview before the subscription gate", () => {
     const text = previewReportText(report);
 
     expect(text).toContain("快速结论");
-    expect(text).toContain("Tranco #42");
-    expect(text).not.toContain("Ahrefs DR 93");
-    expect(text).not.toContain("Google CrUX 已收录");
-    expect(text).not.toContain("第三方 <b>4/4 项</b>");
+    expect(text).toContain("资料来源");
+    expect(text).toContain("取得时间");
+    expect(text).not.toContain("JUYU DOMAIN CHECK");
+    expect(text).not.toContain("Tranco");
+    expect(text).not.toContain("Ahrefs");
+    expect(text).not.toContain("CrUX");
     expect(text).toContain("域名年龄");
     expect(text).toContain("选择你的目的后");
   });
@@ -205,11 +212,18 @@ describe("commerce lead messages", () => {
     const text = fullReportText(report, "research");
 
     expect(text).toContain("一句话结论");
-    expect(text).toContain("为什么这样判断");
+    expect(text).toContain("本次已确认");
+    expect(text).toContain("聚查可继续查询");
+    expect(text).toContain("ICP 备案");
+    expect(text).toContain("中国商标");
+    expect(text).toContain("国内平台风险");
     expect(text).toContain("JUYU 建议");
-    expect(text).toContain("完整查询在聚查");
     expect(text).toContain("历史 WHOIS");
-    expect(text).toContain("Tranco 全球排名 #42");
+    expect(text).not.toContain("完整资料已找到");
+    expect(text).not.toContain("Tranco");
+    expect(text).not.toContain("CrUX");
+    expect(text).not.toContain("Ahrefs");
+    expect(text).not.toContain("Internet Archive");
     expect(text).not.toContain("192.0.2.1");
     expect(text.length).toBeLessThan(4096);
   });
@@ -221,8 +235,10 @@ describe("commerce lead messages", () => {
     expect(text).toContain("ns1.example.com");
     expect(text).toContain("权威注册局资料");
     expect(text).toContain("取得时间");
-    expect(text).toContain("Tranco 全球排名：<b>#42</b>");
-    expect(text).toContain("Chrome UX Report（Google 真实用户 p75）");
+    expect(text).not.toContain("Tranco");
+    expect(text).not.toContain("Chrome UX Report");
+    expect(text).not.toContain("Ahrefs");
+    expect(text).not.toContain("Internet Archive");
     expect(text.length).toBeLessThan(4096);
   });
 

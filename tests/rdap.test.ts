@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { whoisDomain } from "whoiser";
 import { checkRegistration, checkRegistrationWithRetry, checkRdapWithRetry } from "../src/domain/rdap.js";
+
+vi.mock("whoiser", () => ({ whoisDomain: vi.fn() }));
+
+const whoisDomainMock = vi.mocked(whoisDomain);
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  whoisDomainMock.mockReset();
 });
 
 describe("checkRdapWithRetry", () => {
@@ -90,5 +96,29 @@ describe("checkRdapWithRetry", () => {
     const result = await checkRegistration("site.github.io", "github.io", true, 4000);
     expect(result.status).toBe("unknown");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to public WHOIS when RDAP endpoints fail", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("RDAP unavailable")));
+    whoisDomainMock.mockResolvedValue({
+      "whois.registry.example": {
+        __raw: [
+          "Domain Name: FALLBACK.EXAMPLE",
+          "Registrar: Asia Example Registrar",
+          "Creation Date: 2020-01-01T00:00:00Z",
+          "Registry Expiry Date: 2030-01-01T00:00:00Z",
+          "Name Server: NS1.FALLBACK.EXAMPLE",
+        ].join("\r\n"),
+      },
+    } as never);
+
+    const result = await checkRegistrationWithRetry("fallback.example", "example", false, 4000, 1);
+
+    expect(result).toMatchObject({
+      status: "registered",
+      registrar: "Asia Example Registrar",
+      nameServers: ["ns1.fallback.example"],
+      source: { type: "whois", authoritative: false },
+    });
   });
 });

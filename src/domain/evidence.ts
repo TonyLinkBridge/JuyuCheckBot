@@ -1,6 +1,7 @@
 import type { DnsResult, DomainReport, EvidenceItem, RdapResult, StructureFacts } from "./types.js";
+import { eppAlerts } from "./epp.js";
 
-export const REPORT_VERSION = "JUYU-EVIDENCE-3.1";
+export const REPORT_VERSION = "JUYU-EVIDENCE-3.2";
 
 type EvidenceInput = {
   domain: string;
@@ -74,7 +75,7 @@ function evidenceChecklist(rdap: RdapResult, dns: DnsResult): EvidenceItem[] {
 }
 
 function buildAlerts(input: EvidenceInput, ageYears: number | null, daysToExpiry: number | null): string[] {
-  const alerts: string[] = [];
+  const alerts: string[] = [...eppAlerts(input.rdap.statuses)];
   if (input.rdap.status === "unknown") alerts.push("注册状态暂时无法从可用资料源确认");
   if (ageYears !== null && ageYears < 0.25) alerts.push("注册时间不足 3 个月");
   if (daysToExpiry !== null) {
@@ -86,7 +87,7 @@ function buildAlerts(input: EvidenceInput, ageYears: number | null, daysToExpiry
     alerts.push("已确认注册，但未发现有效 DNS 解析");
   }
   if (input.isIdn) alerts.push("包含国际化字符，需核对字符混淆与钓鱼风险");
-  return alerts;
+  return [...new Set(alerts)];
 }
 
 function buildSummary(rdap: RdapResult, dns: DnsResult, alerts: string[]): string {
