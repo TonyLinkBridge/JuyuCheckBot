@@ -130,6 +130,38 @@ describe("Supabase report persistence", () => {
     });
   });
 
+  it("stores the Telegram public profile used by the follow-up dashboard", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ telegram_user_id: 123 }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(
+      loadConfig({
+        BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }),
+    );
+
+    await backend.identifyUser(123, "direct", {
+      username: "tonymumu",
+      firstName: "Tony",
+      lastName: "Link",
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      telegram_username: "tonymumu",
+      telegram_first_name: "Tony",
+      telegram_last_name: "Link",
+    });
+  });
+
   it("keeps user tracking working before the source-label migration is applied", async () => {
     const fetchMock = vi
       .fn()

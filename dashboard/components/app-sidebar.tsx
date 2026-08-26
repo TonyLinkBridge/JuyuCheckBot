@@ -3,14 +3,14 @@ import { logout } from "@/app/actions";
 import { SectionNav } from "@/components/section-nav";
 import { Badge } from "@/components/ui/badge";
 
-export function AppSidebar() {
+export function AppSidebar({ followUpCount = 0, qualityAlerts = 0 }: { followUpCount?: number; qualityAlerts?: number }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="brand-mark">J</div>
-        <div><strong>JUYU</strong><span>Growth Intelligence</span></div>
+        <div><strong>JUYU</strong><span>Domain Check</span></div>
       </div>
-      <SectionNav />
+      <SectionNav followUpCount={followUpCount} qualityAlerts={qualityAlerts} />
       <div className="sidebar-status">
         <div className="status-row"><span className="status-pulse" /><span>Bot 在线</span><Badge>LIVE</Badge></div>
         <p>@JuyuCheckBot</p>

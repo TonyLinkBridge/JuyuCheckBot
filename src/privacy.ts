@@ -4,6 +4,7 @@ export const privacyBotText = `🔐 <b>JUYU 域名体检｜隐私说明</b>
 
 为了生成和恢复报告、验证产品转化，系统会保存：
 • Telegram 数字用户 ID
+• Telegram 公开用户名与显示名称（如有）
 • 你主动提交的域名与使用意图
 • 报告结果、来源标记和产品事件
 
@@ -30,7 +31,7 @@ export function privacyHtml(serviceName: string): string {
   <h1>隐私说明</h1>
   <p>更新日期：2026-08-15</p>
   <h2>我们保存什么</h2>
-  <ul><li>Telegram 数字用户 ID</li><li>用户主动提交的域名与使用意图</li><li>域名报告、来源标记和产品事件</li></ul>
+  <ul><li>Telegram 数字用户 ID</li><li>Telegram 公开用户名与显示名称（如有）</li><li>用户主动提交的域名与使用意图</li><li>域名报告、来源标记和产品事件</li></ul>
   <h2>为什么保存</h2>
   <p>用于生成及恢复报告、提供订阅解锁、衡量产品转化和改进域名资料覆盖。我们不会保存 Bot Token、密码或其他私人聊天内容，也不会出售这些数据。</p>
   <h2>保留与删除</h2>

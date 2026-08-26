@@ -1,16 +1,7 @@
-import { Dashboard } from "@/components/dashboard";
-import { getDashboardData, normalizeRange } from "@/lib/dashboard-data";
-import { requireDashboardSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ range?: string }>;
-}) {
-  await requireDashboardSession();
-  const params = await searchParams;
-  const data = await getDashboardData(normalizeRange(params.range));
-  return <Dashboard data={data} />;
+export default function DashboardPage() {
+  redirect("/inbox");
 }

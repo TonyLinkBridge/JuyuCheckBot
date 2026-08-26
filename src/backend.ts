@@ -46,6 +46,12 @@ export type UserIdentity = {
   isNew: boolean;
 };
 
+export type TelegramPublicProfile = {
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+};
+
 export type RateLimitResult =
   | { allowed: true }
   | { allowed: false; scope: "minute" | "day"; retryAfterSeconds: number };
@@ -53,7 +59,7 @@ export type RateLimitResult =
 export interface Backend {
   enabled: boolean;
   track(event: GrowthEvent): Promise<void>;
-  identifyUser(telegramUserId: number, source: string): Promise<UserIdentity>;
+  identifyUser(telegramUserId: number, source: string, profile?: TelegramPublicProfile): Promise<UserIdentity>;
   getUserSource(telegramUserId: number): Promise<string | null>;
   checkRateLimit(telegramUserId: number): Promise<RateLimitResult>;
   saveReport(record: StoredReport): Promise<boolean>;
@@ -140,7 +146,7 @@ class SupabaseBackend implements Backend {
     });
   }
 
-  async identifyUser(telegramUserId: number, source: string): Promise<UserIdentity> {
+  async identifyUser(telegramUserId: number, source: string, publicProfile?: TelegramPublicProfile): Promise<UserIdentity> {
     const query = new URLSearchParams({
       telegram_user_id: `eq.${telegramUserId}`,
       select: "telegram_user_id",
@@ -151,22 +157,23 @@ class SupabaseBackend implements Backend {
 
     if (rows?.length) {
       const path = `user_profiles?telegram_user_id=eq.${telegramUserId}`;
-      const updated = await this.write("PATCH", path, {
+      const baseUpdate = {
         last_source: source,
-        last_source_label: sourceLabel(source),
         last_seen_at: now,
+      };
+      const updated = await this.write("PATCH", path, {
+        ...baseUpdate,
+        last_source_label: sourceLabel(source),
+        ...telegramProfileColumns(publicProfile),
       });
       if (!updated) {
-        await this.write("PATCH", path, {
-          last_source: source,
-          last_seen_at: now,
-        });
+        await this.write("PATCH", path, baseUpdate);
       }
       return { isNew: false };
     }
 
     const path = "user_profiles?on_conflict=telegram_user_id";
-    const profile = {
+    const baseProfile = {
       telegram_user_id: telegramUserId,
       first_source: source,
       last_source: source,
@@ -177,13 +184,14 @@ class SupabaseBackend implements Backend {
       "POST",
       path,
       {
-        ...profile,
+        ...baseProfile,
         last_source_label: sourceLabel(source),
+        ...telegramProfileColumns(publicProfile),
       },
       "resolution=ignore-duplicates,return=minimal",
     );
     if (!inserted) {
-      inserted = await this.write("POST", path, profile, "resolution=ignore-duplicates,return=minimal");
+      inserted = await this.write("POST", path, baseProfile, "resolution=ignore-duplicates,return=minimal");
     }
     return { isNew: inserted };
   }
@@ -401,6 +409,20 @@ export function createBackend(config: Config): Backend {
     return new SupabaseBackend(config.SUPABASE_URL.replace(/\/$/, ""), config.SUPABASE_SERVICE_ROLE_KEY);
   }
   return new MemoryBackend();
+}
+
+function telegramProfileColumns(profile: TelegramPublicProfile | undefined): Record<string, string | null> {
+  if (!profile) return {};
+  return {
+    telegram_username: cleanTelegramText(profile.username)?.replace(/^@/, "") ?? null,
+    telegram_first_name: cleanTelegramText(profile.firstName) ?? null,
+    telegram_last_name: cleanTelegramText(profile.lastName) ?? null,
+  };
+}
+
+function cleanTelegramText(value: string | undefined): string | null {
+  const cleaned = value?.trim();
+  return cleaned ? cleaned.slice(0, 128) : null;
 }
 
 function parseStoredReport(row: Record<string, unknown>): StoredReport | null {

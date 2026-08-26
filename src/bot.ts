@@ -56,15 +56,20 @@ export function createBot(config: Config): Bot {
   });
 
   bot.command("start", async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
+    const from = ctx.from;
+    if (!from) return;
+    const userId = from.id;
     const payload = ctx.match?.trim();
     const referralToken = payload?.startsWith("ref_") ? payload.slice("ref_".length) : null;
     const sharedReferral = referralToken ? await backend.getReferralReport(referralToken) : null;
     const isSelfReferral = sharedReferral?.telegramUserId === userId;
     const requestedSource = referralToken && !sharedReferral ? "direct" : sourceFromStartPayload(payload);
     const source = attribution.set(userId, isSelfReferral ? "direct" : requestedSource);
-    const identity = await backend.identifyUser(userId, source);
+    const identity = await backend.identifyUser(userId, source, {
+      username: from.username,
+      firstName: from.first_name,
+      lastName: from.last_name,
+    });
     const startEvents = [
       backend.track({
         eventName: "bot_started",

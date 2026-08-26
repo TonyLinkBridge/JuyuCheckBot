@@ -22,7 +22,7 @@ export default async function PollsPage() {
             <p className="topbar-subtitle">Channel acquisition · Server-side publishing</p>
           </div>
           <div className="topbar-actions">
-            <Link href="/" className="back-button"><ArrowLeft size={14} /> 返回总览</Link>
+            <Link href="/inbox" className="back-button"><ArrowLeft size={14} /> 返回收件箱</Link>
             <ThemeToggle />
             <a className="icon-button" href={`https://t.me/${publisher.botUsername}`} target="_blank" rel="noreferrer" aria-label="Open Telegram bot"><ExternalLink size={15} /></a>
           </div>

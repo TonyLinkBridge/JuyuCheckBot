@@ -1,4 +1,5 @@
 import "server-only";
+import { buildFollowUpInbox, type FollowUpEvent, type FollowUpInbox, type FollowUpProfile } from "@/lib/follow-up";
 
 const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.1";
 
@@ -11,7 +12,7 @@ export const rangeOptions = [
 
 export type RangeValue = (typeof rangeOptions)[number]["value"];
 
-type GrowthEvent = {
+type GrowthEvent = FollowUpEvent & {
   event_name: string;
   telegram_user_id: number;
   source: string;
@@ -49,6 +50,7 @@ export type DashboardData = {
   configured: boolean;
   generatedAt: string;
   range: RangeValue;
+  followUp: FollowUpInbox;
   totals: {
     newUsers: Metric;
     toolUsers: Metric;
@@ -193,7 +195,10 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
             return { rows: [] as CommerceLeadRow[], error: "Commerce Supabase 暂时无法读取" };
           })
       : Promise.resolve({ rows: [] as CommerceLeadRow[], error: null as string | null });
-    const [events, reports, commerce] = await Promise.all([
+    const profileRead = readAll<FollowUpProfile>(url, key, "user_profiles", {
+      select: "telegram_user_id,telegram_username,telegram_first_name,telegram_last_name",
+    }).catch(() => [] as FollowUpProfile[]);
+    const [events, reports, profiles, commerce] = await Promise.all([
       readAll<GrowthEvent>(url, key, "growth_events", {
         select: "event_name,telegram_user_id,source,domain,report_token,intent,metadata,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
@@ -204,6 +209,7 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         created_at: `gte.${queryStart.toISOString()}`,
         order: "created_at.asc",
       }),
+      profileRead,
       commerceRead,
     ]);
     return buildDashboard(
@@ -214,6 +220,7 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
       queryStart,
       events,
       reports,
+      profiles,
       commerce.rows,
       commerceConfigured,
       commerce.error,
@@ -259,6 +266,7 @@ function buildDashboard(
   previousStart: Date,
   events: GrowthEvent[],
   reports: ReportRow[],
+  profiles: FollowUpProfile[],
   commerceLeads: CommerceLeadRow[],
   commerceConfigured: boolean,
   commerceError: string | null,
@@ -299,6 +307,7 @@ function buildDashboard(
     configured: true,
     generatedAt: now.toISOString(),
     range,
+    followUp: buildFollowUpInbox(current, now, profiles),
     totals: {
       newUsers: metric(currentMetrics.newUsers, previousMetrics.newUsers, "number", currentMetrics.newUsers),
       toolUsers: metric(currentMetrics.toolUsers, previousMetrics.toolUsers, "number", currentMetrics.toolUsers),
@@ -759,6 +768,7 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
     configured: false,
     generatedAt: now.toISOString(),
     range,
+    followUp: buildFollowUpInbox([], now),
     totals: {
       newUsers: zero("number"),
       toolUsers: zero("number"),
@@ -767,9 +777,14 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       referredUsers: zero("number"),
       loopRate: zero("percent"),
     },
-    funnel: ["New User", "Domain Submitted", "Preview Shown", "Report Unlocked", "Share Generated", "Referred New User"].map(
-      (label, index) => ({ key: String(index), label, value: 0 }),
-    ),
+    funnel: [
+      { key: "new", label: "New User", value: 0 },
+      { key: "submitted", label: "Domain Submitted", value: 0 },
+      { key: "preview", label: "Preview Shown", value: 0 },
+      { key: "unlocked", label: "Report Unlocked", value: 0 },
+      { key: "shared", label: "Share Generated", value: 0 },
+      { key: "referred", label: "Referred New User", value: 0 },
+    ],
     gate: { shown: 0, failed: 0, unlocked: 0, conversionRate: 0, recoveryRate: 0 },
     referral: {
       sharingUsers: 0,

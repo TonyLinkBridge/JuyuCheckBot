@@ -99,11 +99,11 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但作为独立 Vercel Project 部署，避免界面变更影响 Webhook。
 
 - 技术：Next.js、shadcn 风格组件、Tremor/Recharts 图表、Tailwind CSS、Geist
-- 数据：只在服务器端使用 Supabase Service Role，浏览器只接收聚合指标
+- 数据：只在服务器端使用 Supabase Service Role；登录后的管理员页面可查看 Telegram ID 与公开用户名，密钥不会发送到浏览器
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
 - 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
 - 分析：新用户 Cohort Funnel、Referral Funnel、Lead Conversion、Growth Gate 转化、来源质量、报告质量与最近活动
-- 双 Supabase：Dashboard 可在服务器端匹配 Check Bot 导流与 Commerce Bot 已完成 Lead，浏览器不接收 Telegram ID 或联系方式
+- 双 Supabase：Dashboard 可在服务器端匹配 Check Bot 导流与 Commerce Bot 已完成 Lead，并在受保护的管理员页面提供用户跟进信息
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 

@@ -1,105 +1,43 @@
 "use client";
 
-import { Activity, Briefcase, CircleGauge, GitFork, LayoutDashboard, Megaphone, Send, Workflow } from "lucide-react";
+import { Activity, CircleGauge, Inbox, Megaphone, SearchCheck, Send, Settings, Users, Workflow } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { dashboardSections } from "@/lib/dashboard-sections";
 
-const sections = [
-  { id: "overview", label: "总览 Overview", icon: LayoutDashboard },
-  { id: "funnel", label: "漏斗 Funnel", icon: Workflow },
-  { id: "referrals", label: "推荐 Referral", icon: GitFork },
-  { id: "leads", label: "客户 Leads", icon: Briefcase },
-  { id: "sources", label: "获客 Acquisition", icon: Send },
-  { id: "intelligence", label: "质量 Intelligence", icon: CircleGauge },
-  { id: "activity", label: "活动 Activity", icon: Activity },
-] as const;
+const sectionIcons = { inbox: Inbox, users: Users, funnel: Workflow, sources: Send, quality: CircleGauge, activity: Activity, settings: Settings } as const;
 
-type SectionId = (typeof sections)[number]["id"];
-
-function isSectionId(value: string): value is SectionId {
-  return sections.some((section) => section.id === value);
-}
-
-export function SectionNav() {
+export function SectionNav({ followUpCount = 0, qualityAlerts = 0 }: { followUpCount?: number; qualityAlerts?: number }) {
   const pathname = usePathname();
-  const [activeSection, setActiveSection] = useState<SectionId>("overview");
-  const frame = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (pathname !== "/") return;
-
-    function updateActiveSection() {
-      const marker = window.scrollY + Math.min(180, window.innerHeight * 0.3);
-      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
-      let current: SectionId = "overview";
-
-      for (const { id } of sections) {
-        const section = document.getElementById(id);
-        const sectionTop = section ? section.getBoundingClientRect().top + window.scrollY : Number.POSITIVE_INFINITY;
-        if (sectionTop <= marker) current = id;
-      }
-      if (atBottom) current = sections[sections.length - 1].id;
-      setActiveSection(current);
-    }
-
-    function scheduleUpdate() {
-      if (frame.current !== null) return;
-      frame.current = window.requestAnimationFrame(() => {
-        frame.current = null;
-        updateActiveSection();
-      });
-    }
-
-    const hashSection = window.location.hash.slice(1);
-    if (isSectionId(hashSection)) setActiveSection(hashSection);
-    scheduleUpdate();
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("hashchange", scheduleUpdate);
-    return () => {
-      if (frame.current !== null) window.cancelAnimationFrame(frame.current);
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.removeEventListener("hashchange", scheduleUpdate);
-    };
-  }, [pathname]);
-
-  function navigateTo(id: SectionId) {
-    if (pathname !== "/") return;
-    const section = document.getElementById(id);
-    if (!section) return;
-    setActiveSection(id);
-    window.history.replaceState(null, "", `#${id}`);
-    section.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    });
-  }
 
   return (
     <nav className="section-nav" aria-label="Dashboard sections">
       <p>Workspace</p>
-      {sections.map(({ id, label, icon: Icon }) => (
-        <a
-          href={pathname === "/" ? `#${id}` : `/#${id}`}
-          key={id}
-          className={cn(pathname === "/" && activeSection === id && "active")}
-          aria-current={pathname === "/" && activeSection === id ? "page" : undefined}
-          onClick={(event) => {
-            if (pathname !== "/") return;
-            event.preventDefault();
-            navigateTo(id);
-          }}
-        >
-          <Icon size={16} aria-hidden="true" />
-          <span>{label}</span>
-        </a>
-      ))}
+      {dashboardSections.map(({ id, href, label }) => {
+        const Icon = sectionIcons[id];
+        const count = id === "inbox" ? followUpCount : id === "quality" ? qualityAlerts : 0;
+        return (
+          <Link
+            href={href}
+            key={id}
+            className={cn(pathname === href && "active")}
+            aria-current={pathname === href ? "page" : undefined}
+          >
+            <Icon size={16} aria-hidden="true" />
+            <span>{label}</span>
+            {count > 0 ? <b className="nav-count">{count}</b> : null}
+          </Link>
+        );
+      })}
       <p className="nav-group-label">Campaigns</p>
       <a href="/polls" className={cn(pathname === "/polls" && "active")} aria-current={pathname === "/polls" ? "page" : undefined}>
         <Megaphone size={16} aria-hidden="true" />
         <span>Poll 引流</span>
+      </a>
+      <a href="https://t.me/JuyuCheckBot" target="_blank" rel="noreferrer">
+        <SearchCheck size={16} aria-hidden="true" />
+        <span>打开 Bot</span>
       </a>
     </nav>
   );

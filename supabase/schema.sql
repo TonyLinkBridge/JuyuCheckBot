@@ -35,6 +35,9 @@ create table if not exists public.growth_events (
 
 create table if not exists public.user_profiles (
   telegram_user_id bigint primary key,
+  telegram_username text,
+  telegram_first_name text,
+  telegram_last_name text,
   first_source text not null default 'direct',
   last_source text not null default 'direct',
   last_source_label text not null default '直接打开 Telegram Bot',
@@ -65,6 +68,9 @@ alter table public.domain_reports alter column dimension_scores drop default;
 -- Keep the original attribution code for analytics, and add a readable label
 -- for people reviewing user_profiles in Supabase.
 alter table public.user_profiles add column if not exists last_source_label text;
+alter table public.user_profiles add column if not exists telegram_username text;
+alter table public.user_profiles add column if not exists telegram_first_name text;
+alter table public.user_profiles add column if not exists telegram_last_name text;
 
 update public.user_profiles
 set last_source_label = case
