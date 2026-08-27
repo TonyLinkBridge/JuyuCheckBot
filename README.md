@@ -1,6 +1,6 @@
 # 🔍 JUYU 域名体检
 
-`JUYU Domain Check` 是一个面向亚洲与中文用户的 Telegram Growth Bot。用户发送域名后先获得可信初检，订阅 **JUYU 聚域｜域名情报局** 后解锁进阶摘要；完整历史、备案、商标、平台风险与网站资料进入聚查查询，明确买卖需求进入 `@JuyuDomainBot`。
+`JUYU Domain Check` 是一个面向亚洲与中文用户的 Telegram Growth Bot。用户发送域名后先获得可信初检，订阅 **JUYU 聚域｜域名情报局** 后解锁进阶摘要；完整历史、备案、商标、平台风险与网站资料进入聚查查询，购买、注册、出售和咨询需求直接在同一个 `@JuyuCheckBot` 完成。
 
 正式 Bot 用户名：`@JuyuCheckBot`。
 
@@ -9,7 +9,7 @@
 ```text
 新用户 → 发送域名 → Evidence Preview → 选择意图 → 订阅频道 → 进阶摘要
                                                            ├─ 普通查询 → 聚查
-                                                           └─ 买卖需求 → 聚域助手
+                                                           └─ 买卖需求 → 同 Bot 商业流程
                     注册 / DNS / 来源   拥有 / 购买 / 研究       ├→ 分享 → 新用户
                                                           └→ 动态 CTA → Lead
 ```
@@ -24,20 +24,20 @@
 - Preview → 意图 → Growth Gate → `结论 / 关键依据 / 注意事项 / JUYU 建议` 进阶摘要
 - Value-first 首屏与初检：订阅前先显示注册状态、域龄、到期时间、DNS、资料来源、取得时间与快速结论，再询问用户目的
 - `getChatMember` 频道订阅验证和进阶摘要 Growth Gate
-- 可传播的 Telegram 深链，以及带域名参数的 Commerce Bot 买/卖/注册导流
+- 可传播的 Telegram 深链，以及在同一个 Bot 自动带入域名的购买、出售和注册流程
 - Long Polling 本地运行、Vercel/Express Webhook 生产运行、健康检查和 Docker 部署
 - Supabase REST 后端持久保存并按用户安全读回报告，支持 Vercel 跨实例解锁
 - 新用户识别、首次/最近来源、推荐打开、分享卡和完整 Growth Event 漏斗
 - `/recent` 最近报告、15 分钟域名结果缓存、忽略缓存实时重查和安全分享推荐深链
 - Referral Growth Loop：朋友结果作为社交证明、推荐用户专属首屏、跨 Serverless 实例来源归因
 - 决策型 Inline 分享卡：公开分享关键结论、可信信号和资料覆盖，不公开用户买卖意图；收件人可直接点击「免费检查我的域名」进入 Bot，并保留推荐归因
-- Lead Conversion Loop：购买、出售与注册 CTA 先记录商业意向，再一键跳转带域名参数的 `@JuyuDomainBot`
+- Lead Conversion Loop：购买、出售、注册与联系 JUYU 都在 `@JuyuCheckBot` 内完成，保存 Lead 后自动通知管理员
 - Jucha Conversion Loop：聚查按钮经 `/go/jucha` 记录真实点击，再携带域名与 UTM 参数进入聚查综合查询
 - 每用户每分钟 5 次、24 小时 30 次免费体检限流，以及 Webhook 更新去重
 - `/privacy`、公开隐私页面、180 天数据保留与用户自助永久删除
 - 对 RDAP、辅助 WHOIS、Registry WHOIS 与 DNS 临时失败执行重试；资料无法确认时明确显示“未知”，不误报可注册
 - 推荐打开按独立用户计数，最近报告按域名去重
-- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、推荐闭环、潜在客户、来源质量、Growth Gate 与逐注册资料源健康监控
+- 独立的 JUYU Growth Intelligence Dashboard：增长漏斗、商业 Leads、Telegram 用户跟进、推荐闭环、来源质量、Growth Gate 与逐注册资料源健康监控
 - Dashboard Poll 引流发布器：测试/正式频道双目标、服务器端 Token、正式发布确认与 `src_` Campaign 自动归因
 - 未连接 Supabase 时，本地临时报告只在进程内保留 30 分钟
 
@@ -69,7 +69,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
    CHANNEL_USERNAME=JUYU007
    CHANNEL_URL=https://t.me/JUYU007
    CHANNEL_NAME=JUYU 聚域｜域名情报局
-   COMMERCE_BOT_USERNAME=JuyuDomainBot
+   ADMIN_CHAT_ID=接收新 Lead 通知的 Telegram 用户或群组 Chat ID
    JUCHA_URL=https://www.jucha.com/juhe/
    WEBHOOK_URL=https://你的稳定正式域名
    WEBHOOK_SECRET=至少16位、只含 A-Z a-z 0-9 _ - 的随机字符串
@@ -101,7 +101,7 @@ Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但�
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
 - 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
 - 分析：新用户 Cohort Funnel、Referral Funnel、Lead Conversion、Growth Gate 转化、来源质量、报告质量与最近活动
-- 双 Supabase：Dashboard 可在服务器端匹配 Check Bot 导流与 Commerce Bot 已完成 Lead，并在受保护的管理员页面提供用户跟进信息
+- Lead 数据：新版 Lead 从 Check Bot Supabase 读取；可选连接旧 Commerce Supabase，在同一页面继续查看历史 Lead
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 
@@ -142,18 +142,17 @@ npm run dashboard:dev
 6. 用 `/setinline` 选择 `@JuyuCheckBot`，将 Placeholder 设置为：`分享一份 JUYU 域名体检`。这是让分享卡附带按钮所必需的一次性设置。
 7. 将部署平台环境变量中的频道、Bot 用户名与公网 Webhook 地址改成真实值。
 
-命令菜单会在进程启动时自动设置：`/start`、`/check`、`/help`。
+命令菜单会在进程启动时自动设置：`/start`、`/check`、`/buy`、`/sell`、`/contact`、`/cancel`、`/help`、`/recent`、`/privacy`。
 
-## Commerce Bot 深链约定
+## 旧 Commerce Bot 过渡约定
 
-本 Bot 会跳转到 `@JuyuDomainBot` 并传入以下 `/start` 参数：
+`@JuyuCheckBot` 可以直接接收以下 `/start` 参数。旧 `@JuyuDomainBot` 在过渡期只需把相同参数转发回来：
 
 - `buy_abc-com`：委托购买 `abc.com`
 - `sell_abc-com`：出售 `abc.com`
 - `register_abc-com`：委托注册未发现注册记录的域名
-- `check_abc-com`：进一步人工核查
 
-连字符会编码为双连字符，例如 `my-domain.com` → `my--domain-com`。Commerce Bot 应复用 `encodeDomainParam` / `decodeDomainParam` 的规则，避免域名解析歧义。
+连字符会编码为双连字符，例如 `my-domain.com` → `my--domain-com`。旧 Bot 不再创建新 Lead，只保留历史入口和参数跳转；旧 Supabase 不删除。
 
 ## Evidence Report 边界
 
@@ -169,9 +168,19 @@ ICP 备案、中国商标、国内平台风险、网站历史、搜索表现和�
 
 本地开发可以使用内存模式；Vercel 生产部署必须使用 Supabase，否则函数扩缩实例后无法可靠解锁先前生成的报告。
 
-1. 新项目在 Supabase SQL Editor 执行 `supabase/schema.sql`；旧项目再执行 `supabase/evidence-schema-migration.sql`，清空旧版评分字段。
+1. 在 Check Bot Supabase SQL Editor 执行最新版 `supabase/schema.sql`。脚本可重复执行，并会新增 `bot_sessions` 与 `leads`。
 2. 在服务器环境变量填写 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。
 3. 重新部署或重启 Bot；日志出现 `Backend mode: Supabase` 即表示已启用。
+
+## 合并上线顺序
+
+1. 在 Check Bot Supabase 运行最新版 `supabase/schema.sql`。
+2. 在 Check Bot Vercel Project 新增 `ADMIN_CHAT_ID`，保留现有 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。
+3. 重新部署 Check Bot。
+4. 本地执行 `npm run webhook:set -- https://juyu-check-bot.vercel.app`，同步命令菜单和 Webhook。
+5. 管理员在 `@JuyuCheckBot` 私聊发送 `/notifytest`，确认收到通知。
+6. 用一个测试域名走完出售或购买流程，确认 Telegram 管理员通知与 Dashboard `/leads` 页面同时出现记录。
+7. 最后才部署旧 `@JuyuDomainBot` 的跳转版本。旧 Bot 和旧 Supabase 在确认历史链接正常前不要删除。
 
 Service Role Key 只能存在于后端。不要写入 Mini App、网页前端、Telegram 消息或 Git。公开隐私政策地址为部署域名的 `/privacy`。
 

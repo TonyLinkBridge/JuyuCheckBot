@@ -178,7 +178,6 @@ describe("commerce lead messages", () => {
   const config = loadConfig({
     BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
     BOT_USERNAME: "JuyuCheckBot",
-    COMMERCE_BOT_USERNAME: "JuyuDomainBot",
   });
 
   it("routes commercial intent to Commerce Bot and complete research to Jucha", () => {
