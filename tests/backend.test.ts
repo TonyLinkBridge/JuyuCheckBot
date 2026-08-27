@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBackend } from "../src/backend.js";
 import { loadConfig } from "../src/config.js";
+import type { CommerceLead, CommerceSession } from "../src/commerce/types.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -229,5 +230,80 @@ describe("Supabase report persistence", () => {
     const reports = await backend.listReports(123, 5);
 
     expect(reports.map((item) => item.reportToken)).toEqual(["new-a", "new-b"]);
+  });
+});
+
+describe("unified commerce persistence", () => {
+  const config = () => loadConfig({
+    BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+  });
+
+  const session: CommerceSession = {
+    flow: "sell",
+    step: "price",
+    data: { domain: "asset.cn", source: "channel", report_token: "report_123" },
+  };
+
+  it("upserts a user's unfinished commerce session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(config());
+
+    await expect(backend.saveCommerceSession(123, session)).resolves.toBe(true);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("bot_sessions?on_conflict=telegram_user_id");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      telegram_user_id: 123,
+      flow: "sell",
+      step: "price",
+      data: { domain: "asset.cn", source: "channel", report_token: "report_123" },
+      updated_at: expect.any(String),
+    });
+  });
+
+  it("reads and validates an unfinished commerce session", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([session]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })));
+    const backend = createBackend(config());
+
+    await expect(backend.getCommerceSession(123)).resolves.toEqual(session);
+  });
+
+  it("clears a commerce session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(config());
+
+    await expect(backend.clearCommerceSession(123)).resolves.toBe(true);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("bot_sessions?telegram_user_id=eq.123");
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("DELETE");
+  });
+
+  it("creates a Lead and returns its database ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: 28 }]), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = createBackend(config());
+    const lead: CommerceLead = {
+      leadType: "sell",
+      data: { domain: "asset.cn", source: "channel", contact: "@seller" },
+    };
+
+    await expect(backend.createLead(123, "seller", lead)).resolves.toBe(28);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/rest/v1/leads");
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ Prefer: "return=representation" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      lead_type: "sell",
+      telegram_user_id: 123,
+      username: "seller",
+      data: { domain: "asset.cn", source: "channel", contact: "@seller" },
+    });
   });
 });

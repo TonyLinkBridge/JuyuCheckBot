@@ -45,6 +45,24 @@ create table if not exists public.user_profiles (
   last_seen_at timestamptz not null default now()
 );
 
+create table if not exists public.bot_sessions (
+  telegram_user_id bigint primary key references public.user_profiles(telegram_user_id) on delete cascade,
+  flow text not null check (flow in ('buy', 'sell', 'register', 'contact')),
+  step text not null,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.leads (
+  id bigint generated always as identity primary key,
+  lead_type text not null check (lead_type in ('buy', 'sell', 'contact')),
+  telegram_user_id bigint not null references public.user_profiles(telegram_user_id) on delete cascade,
+  username text not null default '',
+  data jsonb not null default '{}'::jsonb,
+  status text not null default 'new',
+  created_at timestamptz not null default now()
+);
+
 create index if not exists domain_reports_user_created_idx
   on public.domain_reports (telegram_user_id, created_at desc);
 create index if not exists domain_reports_domain_created_idx
@@ -55,6 +73,10 @@ create index if not exists growth_events_source_created_idx
   on public.growth_events (source, created_at desc);
 create index if not exists growth_events_user_created_idx
   on public.growth_events (telegram_user_id, created_at desc);
+create index if not exists leads_created_at_idx
+  on public.leads (created_at desc);
+create index if not exists leads_type_status_idx
+  on public.leads (lead_type, status, created_at desc);
 
 -- Idempotent upgrade for projects created with the former required score columns.
 alter table public.domain_reports alter column score drop not null;
@@ -138,6 +160,14 @@ for each row execute function public.clear_legacy_domain_scores();
 alter table public.domain_reports enable row level security;
 alter table public.growth_events enable row level security;
 alter table public.user_profiles enable row level security;
+alter table public.bot_sessions enable row level security;
+alter table public.leads enable row level security;
+
+revoke all on table public.bot_sessions from anon, authenticated;
+revoke all on table public.leads from anon, authenticated;
+grant all on table public.bot_sessions to service_role;
+grant all on table public.leads to service_role;
+grant usage, select on all sequences in schema public to service_role;
 
 -- No public policies are intentionally created. The Bot backend uses the
 -- Service Role Key, which bypasses RLS. Never expose that key to a Mini App.

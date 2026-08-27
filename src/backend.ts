@@ -1,4 +1,5 @@
 import type { Config } from "./config.js";
+import type { CommerceLead, CommerceSession } from "./commerce/types.js";
 import { buildEvidence } from "./domain/evidence.js";
 import { emptyIntelligence } from "./domain/intelligence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
@@ -68,6 +69,10 @@ export interface Backend {
   hasReferralOpen(telegramUserId: number, reportToken: string): Promise<boolean>;
   getRecentReport(domain: string, reportVersion: string, maxAgeMs: number): Promise<DomainReport | null>;
   listReports(telegramUserId: number, limit: number): Promise<StoredReport[]>;
+  saveCommerceSession(telegramUserId: number, session: CommerceSession): Promise<boolean>;
+  getCommerceSession(telegramUserId: number): Promise<CommerceSession | null>;
+  clearCommerceSession(telegramUserId: number): Promise<boolean>;
+  createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<number | null>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
   cleanupExpiredData(retentionDays: number): Promise<void>;
 }
@@ -75,6 +80,8 @@ export interface Backend {
 class MemoryBackend implements Backend {
   enabled = false;
   private readonly users = new Set<number>();
+  private readonly commerceSessions = new Map<number, CommerceSession>();
+  private nextLeadId = 1;
 
   async track(): Promise<void> {}
 
@@ -116,8 +123,28 @@ class MemoryBackend implements Backend {
     return [];
   }
 
+  async saveCommerceSession(telegramUserId: number, session: CommerceSession): Promise<boolean> {
+    this.commerceSessions.set(telegramUserId, structuredClone(session));
+    return true;
+  }
+
+  async getCommerceSession(telegramUserId: number): Promise<CommerceSession | null> {
+    const session = this.commerceSessions.get(telegramUserId);
+    return session ? structuredClone(session) : null;
+  }
+
+  async clearCommerceSession(telegramUserId: number): Promise<boolean> {
+    this.commerceSessions.delete(telegramUserId);
+    return true;
+  }
+
+  async createLead(): Promise<number> {
+    return this.nextLeadId++;
+  }
+
   async deleteUserData(telegramUserId: number): Promise<boolean> {
     this.users.delete(telegramUserId);
+    this.commerceSessions.delete(telegramUserId);
     return true;
   }
 
@@ -332,14 +359,60 @@ class SupabaseBackend implements Backend {
     return [...unique.values()];
   }
 
+  async saveCommerceSession(telegramUserId: number, session: CommerceSession): Promise<boolean> {
+    return this.write(
+      "POST",
+      "bot_sessions?on_conflict=telegram_user_id",
+      {
+        telegram_user_id: telegramUserId,
+        flow: session.flow,
+        step: session.step,
+        data: session.data,
+        updated_at: new Date().toISOString(),
+      },
+      "resolution=merge-duplicates,return=minimal",
+    );
+  }
+
+  async getCommerceSession(telegramUserId: number): Promise<CommerceSession | null> {
+    const query = new URLSearchParams({
+      telegram_user_id: `eq.${telegramUserId}`,
+      select: "flow,step,data",
+      limit: "1",
+    });
+    const rows = await this.readRows(`bot_sessions?${query}`);
+    return rows?.[0] ? parseCommerceSession(rows[0]) : null;
+  }
+
+  async clearCommerceSession(telegramUserId: number): Promise<boolean> {
+    return this.write("DELETE", `bot_sessions?telegram_user_id=eq.${telegramUserId}`);
+  }
+
+  async createLead(
+    telegramUserId: number,
+    username: string | undefined,
+    lead: CommerceLead,
+  ): Promise<number | null> {
+    const rows = await this.writeRows("leads", {
+      lead_type: lead.leadType,
+      telegram_user_id: telegramUserId,
+      username: cleanTelegramText(username)?.replace(/^@/, "") ?? "",
+      data: lead.data,
+    });
+    const id = rows?.[0]?.id;
+    return typeof id === "number" && Number.isSafeInteger(id) ? id : null;
+  }
+
   async deleteUserData(telegramUserId: number): Promise<boolean> {
     const filter = `telegram_user_id=eq.${telegramUserId}`;
-    const [reportsDeleted, eventsDeleted, profileDeleted] = await Promise.all([
+    const [sessionsDeleted, leadsDeleted, reportsDeleted, eventsDeleted] = await Promise.all([
+      this.write("DELETE", `bot_sessions?${filter}`),
+      this.write("DELETE", `leads?${filter}`),
       this.write("DELETE", `domain_reports?${filter}`),
       this.write("DELETE", `growth_events?${filter}`),
-      this.write("DELETE", `user_profiles?${filter}`),
     ]);
-    return reportsDeleted && eventsDeleted && profileDeleted;
+    if (!sessionsDeleted || !leadsDeleted || !reportsDeleted || !eventsDeleted) return false;
+    return this.write("DELETE", `user_profiles?${filter}`);
   }
 
   async cleanupExpiredData(retentionDays: number): Promise<void> {
@@ -395,6 +468,30 @@ class SupabaseBackend implements Backend {
     }
   }
 
+  private async writeRows(path: string, body: Record<string, unknown>): Promise<Array<Record<string, unknown>> | null> {
+    try {
+      const response = await fetch(`${this.url}/rest/v1/${path}`, {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) {
+        console.error(`Supabase write failed: HTTP ${response.status}`);
+        return null;
+      }
+      const value = (await response.json()) as unknown;
+      return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : null;
+    } catch {
+      console.error("Supabase write failed: network error");
+      return null;
+    }
+  }
+
   private headers(): Record<string, string> {
     return {
       apikey: this.serviceRoleKey,
@@ -402,6 +499,20 @@ class SupabaseBackend implements Backend {
       Accept: "application/json",
     };
   }
+}
+
+function parseCommerceSession(row: Record<string, unknown>): CommerceSession | null {
+  const flow = row.flow;
+  const step = row.step;
+  const data = row.data;
+  const validFlows = new Set(["buy", "sell", "register", "contact"]);
+  const validSteps = new Set(["domain", "budget", "purpose", "price", "negotiable", "listed", "contact", "message"]);
+  if (typeof flow !== "string" || !validFlows.has(flow)) return null;
+  if (typeof step !== "string" || !validSteps.has(step)) return null;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const source = (data as Record<string, unknown>).source;
+  if (typeof source !== "string" || !source) return null;
+  return { flow, step, data } as CommerceSession;
 }
 
 export function createBackend(config: Config): Backend {
