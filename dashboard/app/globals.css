@@ -475,6 +475,9 @@ tbody tr:hover td { background: var(--row-hover); }
 .compact-ops-table, .event-table { min-width: 640px; }
 .compact-ops-table th, .event-table th { height: 34px; padding-inline: 11px; font-size: 8px; }
 .compact-ops-table td, .event-table td { height: 44px; padding-inline: 11px; font-size: 9px; }
+.lead-records-table { min-width: 920px; }
+.table-subline { display: block; margin-top: 3px; color: var(--text-faint); font-size: 8px; font-weight: 400; }
+.lead-contact-value { display: inline-block; max-width: 260px; overflow: hidden; color: var(--text-medium); text-overflow: ellipsis; vertical-align: middle; }
 .source-cell { display: grid; gap: 3px; text-align: left; }
 .source-cell strong { max-width: 230px; overflow: hidden; color: var(--text-strong); font-family: var(--font-geist-sans); font-size: 9px; font-weight: 540; text-overflow: ellipsis; white-space: nowrap; }
 .source-cell small { color: var(--text-faint); font-family: var(--font-geist-mono); font-size: 7px; }

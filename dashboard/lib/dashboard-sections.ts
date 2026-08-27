@@ -1,5 +1,6 @@
 export const dashboardSections = [
   { id: "inbox", href: "/inbox", label: "跟进收件箱", eyebrow: "OPERATIONS INBOX", description: "优先处理有买卖意向、解锁失败或资料异常的用户。" },
+  { id: "leads", href: "/leads", label: "商业 Leads", eyebrow: "JUYU COMMERCE", description: "查看用户已提交的购买、注册、出售与咨询需求。" },
   { id: "users", href: "/users", label: "用户管理", eyebrow: "AUDIENCE", description: "查看真实 Telegram 用户 ID、来源、域名和最近行为。" },
   { id: "funnel", href: "/funnel", label: "转化漏斗", eyebrow: "CONVERSION", description: "快速判断用户主要卡在哪一步。" },
   { id: "sources", href: "/sources", label: "来源分析", eyebrow: "ACQUISITION", description: "比较不同入口带来的新用户与实际激活表现。" },

@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   ArrowRight,
+  BadgeDollarSign,
   Check,
   ChevronRight,
   CircleUserRound,
@@ -11,6 +12,8 @@ import {
   Command,
   ExternalLink,
   Filter,
+  Handshake,
+  CirclePlus,
   Search,
   Send,
   ShieldAlert,
@@ -48,6 +51,11 @@ const eventLabels: Record<string, string> = {
   report_unlocked: "解锁完整报告",
   share_generated: "生成分享卡",
   commerce_handoff: "进入聚域助手",
+  lead_started: "开始提交商业需求",
+  lead_step_completed: "填写商业资料",
+  lead_cancelled: "取消商业提交",
+  lead_submitted: "商业 Lead 已提交",
+  lead_notification_failed: "管理员通知失败",
   jucha_handoff: "进入聚查",
   check_failed: "体检失败",
   history_viewed: "查看历史报告",
@@ -163,6 +171,34 @@ export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData
             <SummaryCard label="买卖意向" value={data.followUp.summary.commercialIntent} detail="尚未进入商业流程" icon={Sparkles} tone="amber" />
           </section>
           {userTable}
+        </> : null}
+
+        {activeSection === "leads" ? <>
+          {data.leads.commerceError ? <div className="lead-connection-notice"><AlertCircle size={14} />{data.leads.commerceError}</div> : null}
+          <section className="ops-metric-grid" aria-label="商业 Lead 摘要">
+            <SummaryCard label="全部 Leads" value={data.leads.submittedLeads} detail="新 Bot 与旧 Bot 历史" icon={UserRoundSearch} tone="brand" />
+            <SummaryCard label="购买委托" value={data.leads.buyLeads} detail="已注册域名收购" icon={Handshake} />
+            <SummaryCard label="出售需求" value={data.leads.sellLeads} detail="持有人提交出售" icon={BadgeDollarSign} tone="amber" />
+            <SummaryCard label="注册协助" value={data.leads.registerLeads} detail="可注册域名需求" icon={CirclePlus} />
+          </section>
+          <section className="ops-panel compact-table-panel">
+            <table className="compact-ops-table lead-records-table">
+              <thead><tr><th>Lead</th><th>类型</th><th>Telegram 用户</th><th>域名</th><th>联系方式／需求</th><th>数据来源</th><th>提交时间</th></tr></thead>
+              <tbody>
+                {data.leads.records.length ? data.leads.records.map((lead) => (
+                  <tr key={lead.stableKey}>
+                    <td><strong>#{lead.id}</strong><small className="table-subline">{lead.status === "new" ? "新线索" : lead.status}</small></td>
+                    <td><span className="intent-chip intent-buyer">{leadTypeLabel(lead.leadType, lead.service)}</span></td>
+                    <td>{lead.username ? <a className="id-link" href={`https://t.me/${lead.username}`} target="_blank" rel="noreferrer">@{lead.username}</a> : <strong>{lead.telegramUserId}</strong>}<small className="table-subline">ID {lead.telegramUserId}</small></td>
+                    <td><span className="domain-value">{lead.domain || "—"}</span></td>
+                    <td><span className="lead-contact-value">{lead.contact || "未留下文字联系方式"}</span></td>
+                    <td><span className="source-cell"><strong>{lead.databaseSource === "check" ? "统一 Bot" : "旧 Bot 历史"}</strong><small>{lead.databaseSource}</small></span></td>
+                    <td>{formatDateTime(lead.createdAt)}</td>
+                  </tr>
+                )) : <tr><td colSpan={7} className="compact-empty-row">当前周期还没有已提交的商业 Lead。</td></tr>}
+              </tbody>
+            </table>
+          </section>
         </> : null}
 
         {activeSection === "users" ? userTable : null}
@@ -323,6 +359,13 @@ function filterCount(filter: InboxFilter, items: FollowUpItem[]): number {
 
 function funnelLabel(key: string): string {
   return ({ new: "新用户", submitted: "提交域名", preview: "查看预览", unlocked: "解锁报告", shared: "生成分享", referred: "推荐新用户" } as Record<string, string>)[key] ?? key;
+}
+
+function leadTypeLabel(type: "buy" | "sell" | "contact", service: string | null): string {
+  if (service === "register") return "注册协助";
+  if (type === "buy") return "委托购买";
+  if (type === "sell") return "提交出售";
+  return "联系 JUYU";
 }
 
 function formatPercent(value: number): string {

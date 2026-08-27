@@ -5,6 +5,7 @@ describe("dashboard section routing", () => {
   it("defines a real route for every primary workspace page", () => {
     expect(dashboardSections.map((section) => section.href)).toEqual([
       "/inbox",
+      "/leads",
       "/users",
       "/funnel",
       "/sources",

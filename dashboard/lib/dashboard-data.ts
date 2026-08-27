@@ -1,5 +1,6 @@
 import "server-only";
 import { buildFollowUpInbox, type FollowUpEvent, type FollowUpInbox, type FollowUpProfile } from "@/lib/follow-up";
+import { normalizeCommerceLeads, type CommerceLeadRow, type RawCommerceLeadRow } from "@/lib/lead-sources";
 
 const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.2";
 
@@ -26,15 +27,6 @@ type GrowthEvent = FollowUpEvent & {
 type ReportRow = {
   domain: string;
   report: Record<string, unknown>;
-  created_at: string;
-};
-
-type CommerceLeadRow = {
-  id: number;
-  lead_type: "buy" | "sell" | "contact";
-  telegram_user_id: number;
-  data: Record<string, unknown> | null;
-  status: string;
   created_at: string;
 };
 
@@ -101,6 +93,19 @@ export type DashboardData = {
     buyLeads: number;
     sellLeads: number;
     registerLeads: number;
+    records: Array<{
+      stableKey: string;
+      id: number;
+      databaseSource: "check" | "legacy";
+      leadType: "buy" | "sell" | "contact";
+      service: string | null;
+      telegramUserId: number;
+      username: string | null;
+      domain: string | null;
+      contact: string | null;
+      status: string;
+      createdAt: string;
+    }>;
     opportunities: Array<{
       domain: string;
       intent: "owner" | "buyer";
@@ -181,24 +186,33 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
   const queryStart = new Date(now.getTime() - option.days * 2 * 86_400_000);
   const commerceUrl = process.env.COMMERCE_SUPABASE_URL?.replace(/\/$/, "");
   const commerceKey = process.env.COMMERCE_SUPABASE_SECRET_KEY;
-  const commerceConfigured = Boolean(commerceUrl && commerceKey);
   try {
-    const commerceRead = commerceUrl && commerceKey
-      ? readAll<CommerceLeadRow>(commerceUrl, commerceKey, "leads", {
-          select: "id,lead_type,telegram_user_id,data,status,created_at",
+    const primaryLeadRead = readAll<RawCommerceLeadRow>(url, key, "leads", {
+      select: "id,lead_type,telegram_user_id,username,data,status,created_at",
+      created_at: `gte.${currentStart.toISOString()}`,
+      order: "created_at.asc",
+    })
+      .then((rows) => ({ rows, error: null as string | null }))
+      .catch((error) => {
+        console.error("Unified leads load failed", error instanceof Error ? error.message : "unknown error");
+        return { rows: [] as RawCommerceLeadRow[], error: "新 Lead 表尚未建立，请先运行最新版 supabase/schema.sql" };
+      });
+    const legacyLeadRead = commerceUrl && commerceKey
+      ? readAll<RawCommerceLeadRow>(commerceUrl, commerceKey, "leads", {
+          select: "id,lead_type,telegram_user_id,username,data,status,created_at",
           created_at: `gte.${currentStart.toISOString()}`,
           order: "created_at.asc",
         })
           .then((rows) => ({ rows, error: null as string | null }))
           .catch((error) => {
-            console.error("Commerce leads load failed", error instanceof Error ? error.message : "unknown error");
-            return { rows: [] as CommerceLeadRow[], error: "Commerce Supabase 暂时无法读取" };
+            console.error("Legacy Commerce leads load failed", error instanceof Error ? error.message : "unknown error");
+            return { rows: [] as RawCommerceLeadRow[], error: "旧 Commerce Supabase 暂时无法读取" };
           })
-      : Promise.resolve({ rows: [] as CommerceLeadRow[], error: null as string | null });
+      : Promise.resolve({ rows: [] as RawCommerceLeadRow[], error: null as string | null });
     const profileRead = readAll<FollowUpProfile>(url, key, "user_profiles", {
       select: "telegram_user_id,telegram_username,telegram_first_name,telegram_last_name",
     }).catch(() => [] as FollowUpProfile[]);
-    const [events, reports, profiles, commerce] = await Promise.all([
+    const [events, reports, profiles, primaryLeads, legacyLeads] = await Promise.all([
       readAll<GrowthEvent>(url, key, "growth_events", {
         select: "event_name,telegram_user_id,source,domain,report_token,intent,metadata,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
@@ -210,8 +224,10 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         order: "created_at.asc",
       }),
       profileRead,
-      commerceRead,
+      primaryLeadRead,
+      legacyLeadRead,
     ]);
+    const leadError = [primaryLeads.error, legacyLeads.error].filter(Boolean).join("；") || null;
     return buildDashboard(
       range,
       option.days,
@@ -221,9 +237,9 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
       events,
       reports,
       profiles,
-      commerce.rows,
-      commerceConfigured,
-      commerce.error,
+      normalizeCommerceLeads(primaryLeads.rows, legacyLeads.rows),
+      primaryLeads.error === null,
+      leadError,
     );
   } catch (error) {
     console.error("Growth dashboard data load failed", error instanceof Error ? error.message : "unknown error");
@@ -491,7 +507,7 @@ function buildLeads(
   const intentEvents = events.filter(
     (event) => event.event_name === "intent_selected" && (event.intent === "owner" || event.intent === "buyer"),
   );
-  const handoffEvents = events.filter((event) => event.event_name === "commerce_handoff");
+  const handoffEvents = events.filter((event) => event.event_name === "commerce_handoff" || event.event_name === "lead_started");
   const intentUsers = new Set([...intentEvents, ...handoffEvents].map((event) => event.telegram_user_id));
   const buyerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "buyer").map((event) => event.telegram_user_id));
   const ownerUsers = new Set([...intentEvents, ...handoffEvents].filter((event) => event.intent === "owner").map((event) => event.telegram_user_id));
@@ -499,6 +515,7 @@ function buildLeads(
   const unlockedUsers = new Set(events.filter((event) => event.event_name === "report_unlocked").map((event) => event.telegram_user_id));
   const juchaUsers = new Set(events.filter((event) => event.event_name === "jucha_handoff").map((event) => event.telegram_user_id));
   const checkBotLeads = commerceLeads.filter((lead) => {
+    if (lead.database_source === "check") return true;
     const source = stringData(lead.data, "source");
     const handoffSource = stringData(lead.data, "handoff_source");
     return source === "juyu_check_bot" || handoffSource === "juyu_check_bot";
@@ -579,7 +596,7 @@ function buildLeads(
       submittedUsers: new Set<number>(),
     };
     if (event.event_name === "intent_selected") item.intentUsers.add(event.telegram_user_id);
-    if (event.event_name === "commerce_handoff") {
+    if (event.event_name === "commerce_handoff" || event.event_name === "lead_started") {
       item.intentUsers.add(event.telegram_user_id);
       item.handoffUsers.add(event.telegram_user_id);
       if (submittedUsers.has(event.telegram_user_id)) item.submittedUsers.add(event.telegram_user_id);
@@ -603,6 +620,22 @@ function buildLeads(
     buyLeads: checkBotLeads.filter((lead) => lead.lead_type === "buy" && stringData(lead.data, "service") !== "register").length,
     sellLeads: checkBotLeads.filter((lead) => lead.lead_type === "sell").length,
     registerLeads: checkBotLeads.filter((lead) => stringData(lead.data, "service") === "register").length,
+    records: [...checkBotLeads]
+      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
+      .slice(0, 100)
+      .map((lead) => ({
+        stableKey: lead.stable_key,
+        id: lead.id,
+        databaseSource: lead.database_source,
+        leadType: lead.lead_type,
+        service: stringData(lead.data, "service"),
+        telegramUserId: lead.telegram_user_id,
+        username: cleanLeadUsername(lead.username),
+        domain: stringData(lead.data, "domain"),
+        contact: stringData(lead.data, "contact") ?? stringData(lead.data, "message"),
+        status: lead.status,
+        createdAt: lead.created_at,
+      })),
     opportunities: [...opportunities.values()]
       .sort((left, right) => leadPriorityRank(right.priority) - leadPriorityRank(left.priority) || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
       .slice(0, 12),
@@ -720,6 +753,11 @@ function stringData(data: Record<string, unknown> | null, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function cleanLeadUsername(value: string | undefined): string | null {
+  const cleaned = value?.trim().replace(/^@/, "");
+  return cleaned || null;
+}
+
 function registrationStatus(report: Record<string, unknown>): string {
   const rdap = isRecord(report.rdap) ? report.rdap : null;
   return typeof rdap?.status === "string" ? rdap.status : "unknown";
@@ -818,6 +856,7 @@ function emptyDashboard(range: RangeValue, now: Date): DashboardData {
       buyLeads: 0,
       sellLeads: 0,
       registerLeads: 0,
+      records: [],
       opportunities: [],
       sources: [],
     },

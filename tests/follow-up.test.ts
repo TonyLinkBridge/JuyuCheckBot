@@ -101,4 +101,28 @@ describe("buildFollowUpInbox", () => {
       displayName: "JUYU User",
     });
   });
+
+  it("marks a started but unfinished seller flow as a follow-up opportunity", () => {
+    const result = buildFollowUpInbox([
+      event({ event_name: "intent_selected", telegram_user_id: 7000000005, domain: "asset.cn", report_token: "report-5", intent: "owner", created_at: "2026-08-26T13:00:00.000Z" }),
+      event({ event_name: "lead_started", telegram_user_id: 7000000005, domain: "asset.cn", report_token: "report-5", intent: "owner", metadata: { action: "sell", step: "price" }, created_at: "2026-08-26T13:01:00.000Z" }),
+    ], now);
+
+    expect(result.items[0]).toMatchObject({
+      blocker: "出售资料尚未填完",
+      blockerCode: "commercial_follow_up",
+      priority: "high",
+    });
+  });
+
+  it("resolves commercial follow-up after the Lead is submitted", () => {
+    const result = buildFollowUpInbox([
+      event({ event_name: "intent_selected", telegram_user_id: 7000000006, domain: "buyer.cn", report_token: "report-6", intent: "buyer", created_at: "2026-08-26T13:00:00.000Z" }),
+      event({ event_name: "lead_started", telegram_user_id: 7000000006, domain: "buyer.cn", report_token: "report-6", intent: "buyer", metadata: { action: "buy", step: "budget" }, created_at: "2026-08-26T13:01:00.000Z" }),
+      event({ event_name: "lead_submitted", telegram_user_id: 7000000006, domain: "buyer.cn", report_token: "report-6", intent: "buyer", metadata: { action: "buy", leadId: 28 }, created_at: "2026-08-26T13:05:00.000Z" }),
+    ], now);
+
+    expect(result.items[0]).toMatchObject({ blocker: "购买需求已提交", blockerCode: "resolved", priority: "low" });
+    expect(result.summary.commercialIntent).toBe(0);
+  });
 });

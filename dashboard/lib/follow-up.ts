@@ -164,6 +164,25 @@ function resolveBlocker(
     return { blocker: "体检失败", blockerCode: "check_failed", priority: "high" };
   }
 
+  const leadStarted = findLast(events, (item) => item.event_name === "lead_started");
+  const leadSubmitted = findLast(events, (item) => item.event_name === "lead_submitted");
+  if (leadSubmitted && (!leadStarted || dateValue(leadSubmitted.created_at) >= dateValue(leadStarted.created_at))) {
+    const action = stringMetadata(leadSubmitted, "action");
+    const label = action === "sell" ? "出售需求已提交" : action === "register" ? "注册需求已提交" : action === "contact" ? "咨询已提交" : "购买需求已提交";
+    return { blocker: label, blockerCode: "resolved", priority: "low" };
+  }
+  if (leadStarted) {
+    const resolved = events.some((item) =>
+      (item.event_name === "lead_submitted" || item.event_name === "lead_cancelled")
+      && dateValue(item.created_at) > dateValue(leadStarted.created_at),
+    );
+    if (!resolved) {
+      const action = stringMetadata(leadStarted, "action");
+      const label = action === "sell" ? "出售资料尚未填完" : action === "register" ? "注册资料尚未填完" : action === "contact" ? "咨询资料尚未填完" : "购买资料尚未填完";
+      return { blocker: label, blockerCode: "commercial_follow_up", priority: "high" };
+    }
+  }
+
   const intentSelected = findLast(events, (item) => item.event_name === "intent_selected" && (item.intent === "buyer" || item.intent === "owner"));
   const handoffAfterIntent = intentSelected && events.some(
     (item) => item.event_name === "commerce_handoff" && dateValue(item.created_at) >= dateValue(intentSelected.created_at),
@@ -212,6 +231,11 @@ function findLast(events: FollowUpEvent[], predicate: (item: FollowUpEvent) => b
 function numberMetadata(event: FollowUpEvent | undefined, key: string): number | null {
   const value = event?.metadata?.[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringMetadata(event: FollowUpEvent | undefined, key: string): string | null {
+  const value = event?.metadata?.[key];
+  return typeof value === "string" && value ? value : null;
 }
 
 function dateValue(value: string): number {

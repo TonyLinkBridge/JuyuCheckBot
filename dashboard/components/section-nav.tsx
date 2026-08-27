@@ -1,12 +1,12 @@
 "use client";
 
-import { Activity, CircleGauge, Inbox, Megaphone, SearchCheck, Send, Settings, Users, Workflow } from "lucide-react";
+import { Activity, BriefcaseBusiness, CircleGauge, Inbox, Megaphone, SearchCheck, Send, Settings, Users, Workflow } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { dashboardSections } from "@/lib/dashboard-sections";
 
-const sectionIcons = { inbox: Inbox, users: Users, funnel: Workflow, sources: Send, quality: CircleGauge, activity: Activity, settings: Settings } as const;
+const sectionIcons = { inbox: Inbox, leads: BriefcaseBusiness, users: Users, funnel: Workflow, sources: Send, quality: CircleGauge, activity: Activity, settings: Settings } as const;
 
 export function SectionNav({ followUpCount = 0, qualityAlerts = 0 }: { followUpCount?: number; qualityAlerts?: number }) {
   const pathname = usePathname();
