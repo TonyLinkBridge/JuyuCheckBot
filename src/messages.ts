@@ -7,31 +7,28 @@ import type { DomainIntent, DomainReport, RegistrationStatus } from "./domain/ty
 
 export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 
-一个域名值得继续查、准备买卖，
-还是需要 JUYU 协助？
+输入一个域名，快速查看：
+✓ 注册状态与域龄
+✓ 到期时间与 DNS
+✓ 基础警报与资料来源
 
-直接发送域名，免费查看：
-✓ 注册状态、域龄与 DNS 概况
-✓ 到期时间、资料来源与取得时间
-✓ 基础警报与下一步方向
+深度资料可前往聚查继续查看；
+购买、出售与咨询可直接在本 Bot 提交。
 
-完整历史、风险、备案与网站数据会引导到聚查；
-购买、出售、注册与咨询都可以在同一个 Bot 完成。
-
-直接发送一个域名，例如：
+👇 直接发送域名，例如：
 <code>example.com</code>`;
 
 export function welcomeKeyboard(config: Config): InlineKeyboard {
   return new InlineKeyboard()
     .text("🔍 开始域名体检", "start_check")
     .row()
-    .text("🕘 最近体检", "recent_reports")
-    .text("🔐 隐私", "privacy")
-    .row()
     .text("🤝 委托购买", "commerce:start:buy")
     .text("💰 提交出售", "commerce:start:sell")
     .row()
     .text("💬 联系 JUYU", "commerce:start:contact")
+    .row()
+    .text("🕘 最近体检", "recent_reports")
+    .text("🔐 隐私", "privacy")
     .row()
     .url("📡 JUYU 情报局", config.CHANNEL_URL);
 }

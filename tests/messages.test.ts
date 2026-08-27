@@ -243,10 +243,21 @@ describe("commerce lead messages", () => {
   });
 
   it("keeps checking and commercial actions inside one main Bot", () => {
-    const buttons = welcomeKeyboard(config).inline_keyboard.flat();
+    const keyboard = welcomeKeyboard(config).inline_keyboard;
+    const buttons = keyboard.flat();
 
-    expect(welcomeText).toContain("同一个 Bot");
+    expect(welcomeText).toContain("输入一个域名，快速查看");
+    expect(welcomeText).toContain("深度资料可前往聚查继续查看");
+    expect(welcomeText).not.toContain("完整历史、风险、备案与网站数据会引导到聚查");
     expect(welcomeText).not.toContain("进入 JUYU 聚域助手");
+    expect(keyboard[0]?.[0]?.callback_data).toBe("start_check");
+    expect(keyboard[1]?.map((button) => button.callback_data)).toEqual([
+      "commerce:start:buy",
+      "commerce:start:sell",
+    ]);
+    expect(keyboard[2]?.[0]?.callback_data).toBe("commerce:start:contact");
+    expect(keyboard[3]?.map((button) => button.callback_data)).toEqual(["recent_reports", "privacy"]);
+    expect(keyboard[4]?.[0]?.url).toBe(config.CHANNEL_URL);
     expect(buttons.some((button) => button.callback_data === "commerce:start:buy")).toBe(true);
     expect(buttons.some((button) => button.callback_data === "commerce:start:sell")).toBe(true);
     expect(buttons.some((button) => button.callback_data === "commerce:start:contact")).toBe(true);
