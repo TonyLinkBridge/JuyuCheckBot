@@ -96,6 +96,7 @@ async function startLocalProcess(): Promise<void> {
     { command: "check", description: "体检一个域名" },
     { command: "buy", description: "委托购买域名" },
     { command: "sell", description: "提交出售域名" },
+    { command: "register", description: "协助注册域名" },
     { command: "contact", description: "联系 JUYU" },
     { command: "cancel", description: "取消当前提交" },
     { command: "help", description: "查看使用说明" },

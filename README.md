@@ -142,7 +142,7 @@ npm run dashboard:dev
 6. 用 `/setinline` 选择 `@JuyuCheckBot`，将 Placeholder 设置为：`分享一份 JUYU 域名体检`。这是让分享卡附带按钮所必需的一次性设置。
 7. 将部署平台环境变量中的频道、Bot 用户名与公网 Webhook 地址改成真实值。
 
-命令菜单会在进程启动时自动设置：`/start`、`/check`、`/buy`、`/sell`、`/contact`、`/cancel`、`/help`、`/recent`、`/privacy`。
+命令菜单会在进程启动时自动设置：`/start`、`/check`、`/buy`、`/sell`、`/register`、`/contact`、`/cancel`、`/help`、`/recent`、`/privacy`。
 
 ## 旧 Commerce Bot 过渡约定
 
