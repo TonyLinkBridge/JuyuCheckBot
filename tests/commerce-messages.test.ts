@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { startCommerceFlow } from "../src/commerce/flow.js";
 import {
+  commerceAdminText,
   commerceCompleteText,
   commercePromptKeyboard,
   commercePromptText,
@@ -71,5 +72,25 @@ describe("commerce flow messages", () => {
     expect(text).toContain("asset.cn");
     expect(text).toContain("JUYU 团队会根据你提交的资料进一步联系");
     expect(text).not.toContain("保证成交");
+  });
+
+  it("renders a safe admin notification with Telegram ID and Lead details", () => {
+    const text = commerceAdminText(28, { id: 8831664659, username: "tony<mumu" }, {
+      leadType: "sell",
+      data: {
+        domain: "asset.cn",
+        source: "channel",
+        report_token: "report_123",
+        price: "CNY 20,000",
+        contact: "微信 seller&team",
+      },
+    });
+
+    expect(text).toContain("JUYU 新 Lead #28");
+    expect(text).toContain("用户 ID：<code>8831664659</code>");
+    expect(text).toContain("@tony&lt;mumu");
+    expect(text).toContain("期望售价：CNY 20,000");
+    expect(text).toContain("联系方式：微信 seller&amp;team");
+    expect(text).toContain("报告编号：report_123");
   });
 });

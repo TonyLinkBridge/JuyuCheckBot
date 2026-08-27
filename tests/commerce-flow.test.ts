@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceCommerceChoice,
   advanceCommerceText,
+  resumeCommerceFlow,
   startCommerceFlow,
 } from "../src/commerce/flow.js";
 
@@ -135,6 +136,19 @@ describe("unified commerce flow", () => {
       kind: "invalid",
       reason: "invalid_choice",
       session: started.session,
+    });
+  });
+
+  it("restores the exact prompt for an unfinished flow", () => {
+    const started = startCommerceFlow("sell", { domain: "asset.cn", source: "direct" });
+    if (started.kind !== "prompt") throw new Error("expected prompt");
+    const priced = advanceCommerceChoice(started.session, "price:quote");
+    if (priced.kind !== "prompt") throw new Error("expected prompt");
+
+    expect(resumeCommerceFlow(priced.session)).toEqual({
+      kind: "prompt",
+      prompt: "sell_negotiable",
+      session: priced.session,
     });
   });
 });

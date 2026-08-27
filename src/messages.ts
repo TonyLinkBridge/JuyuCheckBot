@@ -16,7 +16,7 @@ export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 ✓ 基础警报与下一步方向
 
 完整历史、风险、备案与网站数据会引导到聚查；
-明确的购买或出售需求会进入 JUYU 聚域助手。
+购买、出售、注册与咨询都可以在同一个 Bot 完成。
 
 直接发送一个域名，例如：
 <code>example.com</code>`;
@@ -28,6 +28,11 @@ export function welcomeKeyboard(config: Config): InlineKeyboard {
     .text("🕘 最近体检", "recent_reports")
     .text("🔐 隐私", "privacy")
     .row()
+    .text("🤝 委托购买", "commerce:start:buy")
+    .text("💰 提交出售", "commerce:start:sell")
+    .row()
+    .text("💬 联系 JUYU", "commerce:start:contact")
+    .row()
     .url("📡 JUYU 情报局", config.CHANNEL_URL);
 }
 
@@ -36,10 +41,14 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费初检会先显示注册状态、域龄、到期时间、DNS、资料来源和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、备案、中国商标、国内平台风险或网站数据时进入聚查，准备购买或出售时进入 JUYU 聚域助手。
+免费初检会先显示注册状态、域龄、到期时间、DNS、资料来源和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、备案、中国商标、国内平台风险或网站数据时进入聚查。购买、出售、注册和联系 JUYU 都在本 Bot 内完成。
 
 常用命令：
 /recent 最近体检
+/buy 委托购买域名
+/sell 提交出售域名
+/contact 联系 JUYU
+/cancel 取消当前提交
 /privacy 隐私与数据删除
 
 <i>结果仅供初步筛查，不替代商标、法律、安全、估值或交易尽调。</i>`;
@@ -381,13 +390,6 @@ export function botShareLink(botUsername: string, domain: string): string {
 
 function referralLink(botUsername: string, token: string): string {
   return `https://t.me/${botUsername}?start=${encodeURIComponent(`ref_${token}`)}`;
-}
-
-export function commerceLink(botUsername: string, action: string, domain: string): string {
-  const payload = `${action}_${encodeDomainParam(domain)}`;
-  return payload.length <= 64
-    ? `https://t.me/${botUsername}?start=${encodeURIComponent(payload)}`
-    : `https://t.me/${botUsername}`;
 }
 
 export function juchaHandoffLink(

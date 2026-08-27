@@ -23,7 +23,12 @@ export type GrowthEventName =
   | "jucha_handoff"
   | "history_viewed"
   | "refresh_requested"
-  | "technical_details_viewed";
+  | "technical_details_viewed"
+  | "lead_started"
+  | "lead_step_completed"
+  | "lead_cancelled"
+  | "lead_submitted"
+  | "lead_notification_failed";
 
 export type GrowthEvent = {
   eventName: GrowthEventName;

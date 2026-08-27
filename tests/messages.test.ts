@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.js";
 import type { DomainReport } from "../src/domain/types.js";
 import {
-  commerceLink,
   fullReportKeyboard,
   fullReportText,
   juchaDomainLink,
@@ -15,6 +14,8 @@ import {
   inlineShareResult,
   inlineShareToken,
   technicalReportText,
+  welcomeKeyboard,
+  welcomeText,
 } from "../src/messages.js";
 
 const report = {
@@ -242,10 +243,14 @@ describe("commerce lead messages", () => {
     expect(text.length).toBeLessThan(4096);
   });
 
-  it("builds a Commerce Bot deep link with the action and encoded domain", () => {
-    expect(commerceLink("JuyuDomainBot", "buy", "example.com")).toBe(
-      "https://t.me/JuyuDomainBot?start=buy_example-com",
-    );
+  it("keeps checking and commercial actions inside one main Bot", () => {
+    const buttons = welcomeKeyboard(config).inline_keyboard.flat();
+
+    expect(welcomeText).toContain("同一个 Bot");
+    expect(welcomeText).not.toContain("进入 JUYU 聚域助手");
+    expect(buttons.some((button) => button.callback_data === "commerce:start:buy")).toBe(true);
+    expect(buttons.some((button) => button.callback_data === "commerce:start:sell")).toBe(true);
+    expect(buttons.some((button) => button.callback_data === "commerce:start:contact")).toBe(true);
   });
 
   it("builds a tracked Jucha handoff without exposing a Telegram user ID", () => {

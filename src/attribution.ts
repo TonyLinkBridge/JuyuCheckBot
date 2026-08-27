@@ -32,6 +32,7 @@ export function sourceFromStartPayload(payload: string | undefined): string {
   if (payload.startsWith("share_")) return "share";
   if (payload.startsWith("ref_")) return "referral";
   if (payload.startsWith("src_")) return normalizeSource(payload.slice(4));
+  if (/^(buy|sell|register)_[A-Za-z0-9-]+$/.test(payload)) return "juyu_domain_bot";
   if (payload === "channel" || payload === "juyucom") return payload;
   return "direct";
 }

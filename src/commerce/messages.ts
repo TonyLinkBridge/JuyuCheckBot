@@ -110,6 +110,45 @@ export function commerceCompleteText(leadId: number, lead: CommerceLead): string
   return `✅ <b>${title}</b>\n\nLead 编号：<code>#${leadId}</code>${domain}\n\nJUYU 团队会根据你提交的资料进一步联系。`;
 }
 
+export function commerceAdminText(
+  leadId: number,
+  user: { id: number; username?: string },
+  lead: CommerceLead,
+): string {
+  const type = lead.data.service === "register"
+    ? "🎯 协助注册"
+    : lead.leadType === "buy"
+      ? "🤝 委托购买"
+      : lead.leadType === "sell"
+        ? "💰 出售域名"
+        : "💬 联系 JUYU";
+  const labels: Record<string, string> = {
+    domain: "域名",
+    budget: "预算",
+    purpose: "用途",
+    price: "期望售价",
+    negotiable: "议价",
+    listed: "其他平台挂牌",
+    contact: "联系方式",
+    message: "用户留言",
+    source: "来源",
+    service: "服务类型",
+    report_token: "报告编号",
+  };
+  const lines = [
+    `<b>JUYU 新 Lead #${leadId}</b>`,
+    `类型：${type}`,
+    `Telegram：${user.username ? `@${escapeHtml(user.username)}` : user.id}`,
+    `用户 ID：<code>${user.id}</code>`,
+    "",
+  ];
+  for (const [key, value] of Object.entries(lead.data)) {
+    if (value === undefined || value === "") continue;
+    lines.push(`${labels[key] ?? escapeHtml(key)}：${escapeHtml(String(value))}`);
+  }
+  return lines.join("\n");
+}
+
 export function commerceInvalidText(reason: "invalid_domain" | "invalid_choice" | "empty_text"): string {
   if (reason === "invalid_domain") return "⚠️ 这个域名格式看起来不正确，请重新发送，例如：<code>example.com</code>";
   if (reason === "empty_text") return "⚠️ 请发送有效内容后再继续。";

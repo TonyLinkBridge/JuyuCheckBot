@@ -8,6 +8,9 @@ describe("start attribution", () => {
     ["juyucom", "juyucom"],
     ["share_example-com", "share"],
     ["ref_reporttoken", "referral"],
+    ["buy_example-com", "juyu_domain_bot"],
+    ["sell_asset--name-com", "juyu_domain_bot"],
+    ["register_newbrand-cn", "juyu_domain_bot"],
     ["src_kol-Tony!", "kol-tony_"],
   ])("maps %s to %s", (payload, expected) => {
     expect(sourceFromStartPayload(payload)).toBe(expected);

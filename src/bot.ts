@@ -1,6 +1,18 @@
 import { Bot, Context, GrammyError, HttpError, InlineKeyboard } from "grammy";
 import { AttributionStore, sourceFromStartPayload } from "./attribution.js";
 import { createBackend, type StoredReport } from "./backend.js";
+import { advanceCommerceChoice, advanceCommerceText, resumeCommerceFlow, startCommerceFlow } from "./commerce/flow.js";
+import {
+  commerceAdminText,
+  commerceCompleteText,
+  commerceInvalidText,
+  commercePromptKeyboard,
+  commercePromptText,
+  commerceResumeKeyboard,
+  commerceResumeText,
+} from "./commerce/messages.js";
+import { parseCommerceStartPayload } from "./commerce/start.js";
+import type { CommerceAction, CommerceSession, CommerceTransition } from "./commerce/types.js";
 import type { Config } from "./config.js";
 import { checkDomain } from "./domain/check.js";
 import { decodeDomainParam, DomainInputError, normalizeDomain } from "./domain/normalize.js";
@@ -8,7 +20,6 @@ import { REPORT_VERSION } from "./domain/evidence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 import {
   checkingText,
-  commerceLink,
   deleteDataConfirmKeyboard,
   deleteDataConfirmText,
   fullReportKeyboard,
@@ -86,6 +97,13 @@ export function createBot(config: Config): Bot {
       startEvents.push(backend.cleanupExpiredData(PRIVACY_RETENTION_DAYS));
     }
 
+    const commerceStart = parseCommerceStartPayload(payload);
+    if (commerceStart) {
+      await Promise.all(startEvents);
+      await beginCommerce(ctx, commerceStart.action, commerceStart.domain, undefined, source);
+      return;
+    }
+
     if (referralToken && sharedReferral) {
       if (isSelfReferral) {
         await Promise.all([
@@ -132,6 +150,14 @@ export function createBot(config: Config): Bot {
       await Promise.all([...startEvents, runCheck(ctx, decodeDomainParam(payload.slice("check_".length)))]);
       return;
     }
+    const unfinished = await backend.getCommerceSession(userId);
+    if (unfinished) {
+      await Promise.all([
+        ...startEvents,
+        ctx.reply(commerceResumeText(unfinished), { ...html, reply_markup: commerceResumeKeyboard() }),
+      ]);
+      return;
+    }
     await Promise.all([
       ...startEvents,
       ctx.reply(welcomeText, { ...html, reply_markup: welcomeKeyboard(config) }),
@@ -148,6 +174,50 @@ export function createBot(config: Config): Bot {
       return;
     }
     await runCheck(ctx, domain);
+  });
+  bot.command("buy", async (ctx) => beginCommerce(ctx, "buy", ctx.match?.trim() || undefined));
+  bot.command("sell", async (ctx) => beginCommerce(ctx, "sell", ctx.match?.trim() || undefined));
+  bot.command("register", async (ctx) => beginCommerce(ctx, "register", ctx.match?.trim() || undefined));
+  bot.command("contact", async (ctx) => beginCommerce(ctx, "contact"));
+  bot.command("cancel", async (ctx) => cancelCommerce(ctx));
+  bot.command("notifytest", async (ctx) => {
+    const allowed = config.ADMIN_CHAT_ID
+      && (String(ctx.from?.id) === config.ADMIN_CHAT_ID || String(ctx.chat.id) === config.ADMIN_CHAT_ID);
+    if (!allowed) {
+      await ctx.reply(config.ADMIN_CHAT_ID ? "⛔ 只有已配置的管理员可以测试 Lead 通知。" : "⚠️ ADMIN_CHAT_ID 尚未配置。", html);
+      return;
+    }
+    await ctx.api.sendMessage(config.ADMIN_CHAT_ID!, "✅ <b>JUYU Lead 管理员通知测试成功</b>", html);
+  });
+
+  bot.callbackQuery(/^commerce:start:(buy|sell|register|contact)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await beginCommerce(ctx, ctx.match[1] as CommerceAction);
+  });
+
+  bot.callbackQuery("commerce:resume", async (ctx) => {
+    const session = await backend.getCommerceSession(ctx.from.id);
+    if (!session) {
+      await ctx.answerCallbackQuery({ text: "没有未完成的操作。", show_alert: true });
+      return;
+    }
+    await ctx.answerCallbackQuery();
+    await sendCommerceTransition(ctx, resumeCommerceFlow(session), false);
+  });
+
+  bot.callbackQuery("commerce:cancel", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await cancelCommerce(ctx);
+  });
+
+  bot.callbackQuery(/^commerce:choice:(.+)$/, async (ctx) => {
+    const session = await backend.getCommerceSession(ctx.from.id);
+    if (!session) {
+      await ctx.answerCallbackQuery({ text: "这个操作已经过期，请重新开始。", show_alert: true });
+      return;
+    }
+    await ctx.answerCallbackQuery();
+    await sendCommerceTransition(ctx, advanceCommerceChoice(session, ctx.match[1] ?? ""), true);
   });
 
   bot.callbackQuery("start_check", async (ctx) => {
@@ -300,30 +370,8 @@ export function createBot(config: Config): Bot {
       return;
     }
     const action = intent === "owner" ? "sell" : stored.report.rdap.status === "available" ? "register" : "buy";
-    const handoffLink = commerceLink(config.COMMERCE_BOT_USERNAME, action, stored.report.domain);
-    await backend.track({
-      eventName: "commerce_handoff",
-      telegramUserId: ctx.from.id,
-      source: stored.source,
-      domain: stored.report.domain,
-      reportToken: token,
-      intent,
-      metadata: {
-        action,
-        registrationStatus: stored.report.rdap.status,
-        registrationSource: stored.report.rdap.source.type,
-        dataCoverage: stored.report.dataCoverage,
-      },
-    });
-
-    try {
-      await ctx.answerCallbackQuery({ text: "正在打开 JUYU 聚域助手…", url: handoffLink });
-    } catch {
-      await ctx.reply("商业委托入口已准备好，请点击下方按钮继续：", {
-        ...html,
-        reply_markup: new InlineKeyboard().url(leadActionLabel(action), handoffLink),
-      });
-    }
+    await ctx.answerCallbackQuery({ text: action === "sell" ? "开始提交出售需求" : action === "register" ? "开始注册协助" : "开始收购委托" });
+    await beginCommerce(ctx, action, stored.report.domain, token, stored.source);
   });
 
   bot.callbackQuery(/^intent:(owner|buyer|research):([A-Za-z0-9_-]+)$/, async (ctx) => {
@@ -421,8 +469,184 @@ export function createBot(config: Config): Bot {
 
   bot.on("message:text", async (ctx) => {
     if (ctx.chat.type !== "private") return;
+    const session = await backend.getCommerceSession(ctx.from.id);
+    if (session) {
+      await sendCommerceTransition(ctx, advanceCommerceText(session, ctx.message.text), true);
+      return;
+    }
     await runCheck(ctx, ctx.message.text);
   });
+
+  async function beginCommerce(
+    ctx: Context,
+    action: CommerceAction,
+    domain?: string,
+    reportToken?: string,
+    sourceOverride?: string,
+  ): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    const source = sourceOverride ?? await sourceForUser(userId);
+    let transition: CommerceTransition;
+    try {
+      transition = startCommerceFlow(action, { domain, source, reportToken });
+    } catch {
+      await ctx.reply("⚠️ 域名格式不正确，请重新发送，例如：<code>example.com</code>", html);
+      return;
+    }
+    if (transition.kind !== "prompt") return;
+    const saved = await backend.saveCommerceSession(userId, transition.session);
+    if (!saved) {
+      await ctx.reply("⚠️ 暂时无法开始提交，请稍后重试。", html);
+      return;
+    }
+    await Promise.all([
+      backend.track({
+        eventName: "lead_started",
+        telegramUserId: userId,
+        source,
+        domain: transition.session.data.domain,
+        reportToken,
+        intent: commerceIntent(action),
+        metadata: { action, step: transition.session.step },
+      }),
+      ctx.reply(commercePromptText(transition), {
+        ...html,
+        reply_markup: commercePromptKeyboard(transition.prompt),
+      }),
+    ]);
+  }
+
+  async function sendCommerceTransition(
+    ctx: Context,
+    transition: CommerceTransition,
+    trackStep: boolean,
+  ): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    if (transition.kind === "invalid") {
+      await ctx.reply(commerceInvalidText(transition.reason), html);
+      return;
+    }
+    if (transition.kind === "complete") {
+      await completeCommerce(ctx, transition.lead);
+      return;
+    }
+    const saved = await backend.saveCommerceSession(userId, transition.session);
+    if (!saved) {
+      await ctx.reply("⚠️ 暂时无法保存这一步，请稍后重试。", html);
+      return;
+    }
+    const source = transition.session.data.source;
+    const tasks: Promise<unknown>[] = [
+      ctx.reply(commercePromptText(transition), {
+        ...html,
+        reply_markup: commercePromptKeyboard(transition.prompt),
+      }),
+    ];
+    if (trackStep) {
+      tasks.push(backend.track({
+        eventName: "lead_step_completed",
+        telegramUserId: userId,
+        source,
+        domain: transition.session.data.domain,
+        reportToken: transition.session.data.report_token,
+        intent: commerceIntent(transition.session.flow),
+        metadata: { action: transition.session.flow, step: transition.session.step },
+      }));
+    }
+    await Promise.all(tasks);
+  }
+
+  async function completeCommerce(ctx: Context, lead: Extract<CommerceTransition, { kind: "complete" }>["lead"]): Promise<void> {
+    const from = ctx.from;
+    if (!from) return;
+    const leadId = await backend.createLead(from.id, from.username, lead);
+    if (leadId === null) {
+      await ctx.reply("⚠️ 资料暂时无法提交。你的当前步骤已经保留，请稍后再试。", html);
+      return;
+    }
+    const source = lead.data.source;
+    const action = lead.data.service === "register" ? "register" : lead.leadType;
+    const submitted = backend.track({
+      eventName: "lead_submitted",
+      telegramUserId: from.id,
+      source,
+      domain: lead.data.domain,
+      reportToken: lead.data.report_token,
+      intent: commerceIntent(action),
+      metadata: { action, leadId },
+    });
+    await Promise.all([
+      backend.clearCommerceSession(from.id),
+      submitted,
+      ctx.reply(commerceCompleteText(leadId, lead), {
+        ...html,
+        reply_markup: new InlineKeyboard()
+          .text("🔍 继续体检", "start_check")
+          .row()
+          .url("📡 JUYU 情报局", config.CHANNEL_URL),
+      }),
+    ]);
+
+    const notified = await notifyCommerceAdmin(leadId, { id: from.id, username: from.username }, lead);
+    if (!notified) {
+      await backend.track({
+        eventName: "lead_notification_failed",
+        telegramUserId: from.id,
+        source,
+        domain: lead.data.domain,
+        reportToken: lead.data.report_token,
+        intent: commerceIntent(action),
+        metadata: { action, leadId, reason: config.ADMIN_CHAT_ID ? "telegram_send_failed" : "admin_chat_not_configured" },
+      });
+    }
+  }
+
+  async function notifyCommerceAdmin(
+    leadId: number,
+    user: { id: number; username?: string },
+    lead: Extract<CommerceTransition, { kind: "complete" }>["lead"],
+  ): Promise<boolean> {
+    if (!config.ADMIN_CHAT_ID) {
+      console.error(`Lead #${leadId} saved but ADMIN_CHAT_ID is not configured`);
+      return false;
+    }
+    try {
+      await bot.api.sendMessage(config.ADMIN_CHAT_ID, commerceAdminText(leadId, user, lead), html);
+      return true;
+    } catch (error) {
+      console.error(`Lead #${leadId} admin notification failed`, error instanceof Error ? error.message : "unknown error");
+      return false;
+    }
+  }
+
+  async function cancelCommerce(ctx: Context): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    const session = await backend.getCommerceSession(userId);
+    if (!session) {
+      await ctx.reply("目前没有进行中的提交。", html);
+      return;
+    }
+    const cleared = await backend.clearCommerceSession(userId);
+    if (!cleared) {
+      await ctx.reply("⚠️ 暂时无法取消，请稍后重试。", html);
+      return;
+    }
+    await Promise.all([
+      backend.track({
+        eventName: "lead_cancelled",
+        telegramUserId: userId,
+        source: session.data.source,
+        domain: session.data.domain,
+        reportToken: session.data.report_token,
+        intent: commerceIntent(session.flow),
+        metadata: { action: session.flow, step: session.step },
+      }),
+      ctx.reply("✅ 已取消当前操作。你可以继续发送域名进行体检。", html),
+    ]);
+  }
 
   bot.catch((error) => {
     const cause = error.error;
@@ -638,8 +862,8 @@ function intentLabel(intent: DomainIntent): string {
   return "只是研究看看";
 }
 
-function leadActionLabel(action: string): string {
-  if (action === "sell") return "💰 进入出售 / 深度评估";
-  if (action === "register") return "🎯 进入协助注册";
-  return "🤝 进入协助收购";
+function commerceIntent(action: string): DomainIntent | undefined {
+  if (action === "sell") return "owner";
+  if (action === "buy" || action === "register") return "buyer";
+  return undefined;
 }

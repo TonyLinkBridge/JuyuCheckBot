@@ -7,8 +7,8 @@ const schema = z.object({
   CHANNEL_USERNAME: z.string().default("JUYU007").transform(stripAt),
   CHANNEL_URL: z.url().default("https://t.me/JUYU007"),
   CHANNEL_NAME: z.string().default("JUYU 聚域｜域名情报局"),
-  COMMERCE_BOT_USERNAME: z.string().default("JuyuDomainBot").transform(stripAt),
   JUCHA_URL: z.url().default("https://www.jucha.com/juhe/"),
+  ADMIN_CHAT_ID: z.string().optional().transform(emptyToUndefined),
   WEBHOOK_URL: z.string().optional().transform((value) => emptyToUndefined(value)?.replace(/\/$/, "")),
   WEBHOOK_SECRET: z
     .string()

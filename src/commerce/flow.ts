@@ -107,6 +107,11 @@ export function advanceCommerceChoice(session: CommerceSession, choice: Commerce
   return invalid("invalid_choice", session);
 }
 
+export function resumeCommerceFlow(session: CommerceSession): CommerceTransition {
+  const promptKey = resumePrompt(session);
+  return promptKey ? { kind: "prompt", prompt: promptKey, session } : invalid("invalid_choice", session);
+}
+
 function nextAfterDomain(action: CommerceAction, data: CommerceData): CommerceTransition {
   if (action === "buy") return prompt("buy_budget", action, "budget", data);
   if (action === "sell") return prompt("sell_price", action, "price", data);
@@ -132,4 +137,24 @@ function prompt(
 
 function invalid(reason: Extract<CommerceTransition, { kind: "invalid" }>["reason"], session: CommerceSession): CommerceTransition {
   return { kind: "invalid", reason, session };
+}
+
+function resumePrompt(session: CommerceSession): Extract<CommerceTransition, { kind: "prompt" }>["prompt"] | null {
+  if (session.step === "domain") {
+    return session.flow === "buy" ? "buy_domain" : session.flow === "sell" ? "sell_domain" : "register_domain";
+  }
+  if (session.flow === "buy") {
+    if (session.step === "budget") return "buy_budget";
+    if (session.step === "purpose") return "buy_purpose";
+    if (session.step === "contact") return "buy_contact";
+  }
+  if (session.flow === "sell") {
+    if (session.step === "price") return "sell_price";
+    if (session.step === "negotiable") return "sell_negotiable";
+    if (session.step === "listed") return "sell_listed";
+    if (session.step === "contact") return "sell_contact";
+  }
+  if (session.flow === "register" && session.step === "contact") return "register_contact";
+  if (session.flow === "contact" && session.step === "message") return "contact_message";
+  return null;
 }
