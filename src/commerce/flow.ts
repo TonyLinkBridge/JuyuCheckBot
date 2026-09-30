@@ -11,9 +11,11 @@ import type {
 const budgets = {
   under_5k: "低于 CNY 5,000",
   "5k_20k": "CNY 5,000–20,000",
+  under_20k: "低于 CNY 20,000",
   "20k_100k": "CNY 20,000–100,000",
   "100k_500k": "CNY 100,000–500,000",
   over_500k: "CNY 500,000 以上",
+  over_100k: "CNY 100,000 以上",
   unsure: "暂时不确定",
 } as const;
 
@@ -56,7 +58,7 @@ export function advanceCommerceText(session: CommerceSession, rawText: string): 
   }
 
   if (session.flow === "sell" && session.step === "price") {
-    return prompt("sell_negotiable", "sell", "negotiable", { ...session.data, price: text.slice(0, 100) });
+    return prompt("sell_contact", "sell", "contact", { ...session.data, price: text.slice(0, 100) });
   }
 
   if (session.step === "contact") {
@@ -78,7 +80,7 @@ export function advanceCommerceChoice(session: CommerceSession, choice: Commerce
   if (session.flow === "buy" && session.step === "budget" && choice.startsWith("budget:")) {
     const key = choice.slice("budget:".length) as keyof typeof budgets;
     const value = budgets[key];
-    if (value) return prompt("buy_purpose", "buy", "purpose", { ...session.data, budget: value });
+    if (value) return prompt("buy_contact", "buy", "contact", { ...session.data, budget: value });
   }
 
   if (session.flow === "buy" && session.step === "purpose" && choice.startsWith("purpose:")) {
@@ -89,7 +91,7 @@ export function advanceCommerceChoice(session: CommerceSession, choice: Commerce
 
   if (session.flow === "sell" && session.step === "price" && choice.startsWith("price:")) {
     const value = choice === "price:quote" ? "待报价 / 面议" : choice === "price:unsure" ? "暂时不确定" : null;
-    if (value) return prompt("sell_negotiable", "sell", "negotiable", { ...session.data, price: value });
+    if (value) return prompt("sell_contact", "sell", "contact", { ...session.data, price: value });
   }
 
   if (session.flow === "sell" && session.step === "negotiable" && choice.startsWith("negotiable:")) {

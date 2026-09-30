@@ -4,8 +4,10 @@ import type { DomainReport } from "../src/domain/types.js";
 import {
   fullReportKeyboard,
   fullReportText,
+  resultKeyboard,
   juchaDomainLink,
   juchaHandoffLink,
+  juchaAccessKeyboard,
   previewReportText,
   referralWelcomeKeyboard,
   referralWelcomeText,
@@ -205,7 +207,24 @@ describe("commerce lead messages", () => {
     expect(text).not.toContain("Ahrefs");
     expect(text).not.toContain("CrUX");
     expect(text).toContain("域名年龄");
-    expect(text).toContain("选择你的目的后");
+    expect(text).not.toContain("选择你的目的后");
+    expect(text).toContain("购买前仍需继续核对历史、商标和市场资料");
+  });
+
+  it("shows one result with three clear next actions instead of an intent questionnaire", () => {
+    const keyboard = resultKeyboard(config, report, "token_123").inline_keyboard;
+    const buttons = keyboard.flat();
+
+    expect(buttons.map((button) => button.text)).toEqual([
+      "🔓 解锁聚查完整资料",
+      "🤝 我要购买这个域名",
+      "💰 我要出售这个域名",
+    ]);
+    expect(buttons[0]?.callback_data).toBe("intent:research:token_123");
+    expect(buttons[1]?.callback_data).toBe("lead:buyer:token_123");
+    expect(buttons[2]?.callback_data).toBe("lead:owner:token_123");
+    expect(buttons.some((button) => button.callback_data?.startsWith("refresh:"))).toBe(false);
+    expect(buttons.some((button) => button.callback_data?.startsWith("share:"))).toBe(false);
   });
 
   it("leads with a decision, evidence and JUYU action", () => {
@@ -251,16 +270,9 @@ describe("commerce lead messages", () => {
     expect(welcomeText).not.toContain("完整历史、风险、备案与网站数据会引导到聚查");
     expect(welcomeText).not.toContain("进入 JUYU 聚域助手");
     expect(keyboard[0]?.[0]?.callback_data).toBe("start_check");
-    expect(keyboard[1]?.map((button) => button.callback_data)).toEqual([
-      "commerce:start:buy",
-      "commerce:start:sell",
-    ]);
-    expect(keyboard[2]?.[0]?.callback_data).toBe("commerce:start:contact");
-    expect(keyboard[3]?.map((button) => button.callback_data)).toEqual(["recent_reports", "privacy"]);
-    expect(keyboard[4]?.[0]?.url).toBe(config.CHANNEL_URL);
-    expect(buttons.some((button) => button.callback_data === "commerce:start:buy")).toBe(true);
-    expect(buttons.some((button) => button.callback_data === "commerce:start:sell")).toBe(true);
-    expect(buttons.some((button) => button.callback_data === "commerce:start:contact")).toBe(true);
+    expect(keyboard[1]?.[0]?.callback_data).toBe("commerce_menu");
+    expect(keyboard[2]?.[0]?.callback_data).toBe("more_menu");
+    expect(buttons).toHaveLength(3);
   });
 
   it("builds a tracked Jucha handoff without exposing a Telegram user ID", () => {
@@ -277,5 +289,15 @@ describe("commerce lead messages", () => {
     expect(destination).toContain("https://www.jucha.com/zonghe/example.com");
     expect(destination).not.toContain("domain=example.com");
     expect(destination).toContain("utm_campaign=juyu_domain_check");
+  });
+
+  it("offers one-tap domain copying because Jucha does not consume prefill parameters", () => {
+    const keyboard = juchaAccessKeyboard(config, report, "token_123").inline_keyboard;
+
+    expect(keyboard[0]?.[0]).toMatchObject({
+      text: "📋 复制 example.com",
+      copy_text: { text: "example.com" },
+    });
+    expect(keyboard[1]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
   });
 });

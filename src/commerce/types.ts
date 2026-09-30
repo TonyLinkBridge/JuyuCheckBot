@@ -61,7 +61,7 @@ export type CommerceStartContext = {
 };
 
 export type CommerceChoice =
-  | `budget:${"under_5k" | "5k_20k" | "20k_100k" | "100k_500k" | "over_500k" | "unsure"}`
+  | `budget:${"under_5k" | "5k_20k" | "under_20k" | "20k_100k" | "100k_500k" | "over_500k" | "over_100k" | "unsure"}`
   | `purpose:${"brand" | "startup" | "investment" | "website" | "other"}`
   | `price:${"quote" | "unsure"}`
   | `negotiable:${"yes" | "no" | "maybe"}`

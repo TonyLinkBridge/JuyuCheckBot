@@ -18,15 +18,29 @@ export const welcomeText = `🌐 <b>JUYU 域名体检</b>
 👇 直接发送域名，例如：
 <code>example.com</code>`;
 
-export function welcomeKeyboard(config: Config): InlineKeyboard {
+export function welcomeKeyboard(_config: Config): InlineKeyboard {
   return new InlineKeyboard()
     .text("🔍 开始域名体检", "start_check")
     .row()
+    .text("🤝 我要购买或出售", "commerce_menu")
+    .row()
+    .text("⋯ 更多功能", "more_menu");
+}
+
+export const commerceMenuText = `🤝 <b>JUYU 域名服务</b>\n\n请选择你需要的协助：`;
+
+export function commerceMenuKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
     .text("🤝 委托购买", "commerce:start:buy")
     .text("💰 提交出售", "commerce:start:sell")
     .row()
-    .text("💬 联系 JUYU", "commerce:start:contact")
-    .row()
+    .text("💬 联系 JUYU", "commerce:start:contact");
+}
+
+export const moreMenuText = `⋯ <b>更多功能</b>`;
+
+export function moreMenuKeyboard(config: Config): InlineKeyboard {
+  return new InlineKeyboard()
     .text("🕘 最近体检", "recent_reports")
     .text("🔐 隐私", "privacy")
     .row()
@@ -38,7 +52,7 @@ export const helpText = `🔍 <b>如何使用 JUYU 域名体检</b>
 直接发送域名或完整网址，例如：
 <code>example.com</code>
 
-免费初检会先显示注册状态、域龄、到期时间、DNS、资料来源和快速结论。选择目的后，订阅 JUYU 情报局即可解锁进阶摘要；需要完整历史、备案、中国商标、国内平台风险或网站数据时进入聚查。购买、出售、注册和联系 JUYU 都在本 Bot 内完成。
+Bot 会用一份结果显示注册状态、域龄、到期时间、DNS、资料来源和快速结论。需要完整历史、备案、中国商标、国内平台风险或网站数据时，可订阅 JUYU 情报局后进入聚查；购买、出售、注册和联系 JUYU 都可在本 Bot 内提交。
 
 常用命令：
 /recent 最近体检
@@ -72,7 +86,28 @@ DNS 状态　${dnsStatusLine(report)}
 <b>快速结论</b>
 ${escapeHtml(decisionConclusion(report, "research"))}
 
-<i>这是免费初筛，不代替完整尽调。选择你的目的后查看下一步。</i>`;
+<i>这是免费初筛，不代替完整尽调。购买前仍需继续核对历史、商标和市场资料。</i>`;
+}
+
+export function resultKeyboard(
+  _config: Config,
+  report: DomainReport,
+  token: string,
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard()
+    .text("🔓 解锁聚查完整资料", `intent:research:${token}`);
+
+  if (report.rdap.status === "available") {
+    return keyboard
+      .row()
+      .text("🎯 请 JUYU 协助注册", `lead:buyer:${token}`);
+  }
+
+  return keyboard
+    .row()
+    .text("🤝 我要购买这个域名", `lead:buyer:${token}`)
+    .row()
+    .text("💰 我要出售这个域名", `lead:owner:${token}`);
 }
 
 export const intentPromptText = `为了给你真正有用的下一步：
@@ -90,15 +125,9 @@ export function intentKeyboard(token: string): InlineKeyboard {
 }
 
 export function gateText(config: Config): string {
-  return `🔒 <b>解锁 JUYU 进阶体检摘要</b>
+  return `🔒 <b>继续查看完整域名资料</b>
 
-进阶摘要包含：
-✓ 一句话说明这个域名现在是什么情况
-✓ 最重要的 2–3 项可验证依据
-✓ 需要继续核查的重点
-✓ 根据买家 / 持有人 / 研究目的给出下一步
-
-完整历史、ICP 备案、中国商标、国内平台风险、网站与价格资料，需前往聚查继续查询。
+完整历史、ICP 备案、中国商标、国内平台风险、网站与价格资料，将引导到聚查继续查询。
 
 免费订阅
 <b>${escapeHtml(config.CHANNEL_NAME)}</b>
@@ -110,6 +139,29 @@ export function gateKeyboard(config: Config, token: string, intent: DomainIntent
     .url("📡 订阅 JUYU 情报局", config.CHANNEL_URL)
     .row()
     .text("✅ 我已订阅｜立即解锁", `unlock:${intent}:${token}`);
+}
+
+export function juchaAccessText(report: DomainReport): string {
+  return `✅ <b>已解锁完整资料入口</b>
+
+🌐 <b>${escapeHtml(report.domain)}</b>
+
+可前往聚查继续查询历史 WHOIS、历史 DNS、备案、商标、网站与市场资料。
+
+聚查目前不会自动填入域名：请先复制域名，再打开聚查粘贴查询。`;
+}
+
+export function juchaAccessKeyboard(
+  config: Config,
+  report: DomainReport,
+  token: string,
+): InlineKeyboard {
+  return new InlineKeyboard()
+    .copyText(`📋 复制 ${report.domain}`, report.domain)
+    .row()
+    .url("🔓 打开聚查完整查询", juchaHandoffLink(config, report.domain, "research", token))
+    .row()
+    .text("🔎 检查另一个域名", "check_another");
 }
 
 export function fullReportText(report: DomainReport, intent: DomainIntent): string {

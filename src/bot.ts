@@ -20,18 +20,20 @@ import { REPORT_VERSION } from "./domain/evidence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 import {
   checkingText,
+  commerceMenuKeyboard,
+  commerceMenuText,
   deleteDataConfirmKeyboard,
   deleteDataConfirmText,
-  fullReportKeyboard,
-  fullReportText,
   gateKeyboard,
   gateText,
   helpText,
-  intentKeyboard,
-  intentPromptText,
   inlineShareResult,
   inlineShareToken,
+  juchaAccessKeyboard,
+  juchaAccessText,
   notSubscribedText,
+  moreMenuKeyboard,
+  moreMenuText,
   previewReportText,
   privacyKeyboard,
   rateLimitText,
@@ -39,6 +41,7 @@ import {
   recentReportsText,
   referralWelcomeKeyboard,
   referralWelcomeText,
+  resultKeyboard,
   shareCardKeyboard,
   shareCardText,
   juchaHandoffLink,
@@ -221,8 +224,17 @@ export function createBot(config: Config): Bot {
   });
 
   bot.callbackQuery("start_check", async (ctx) => {
+    await ctx.answerCallbackQuery({ text: "请直接在下方发送域名，例如 example.com" });
+  });
+
+  bot.callbackQuery("commerce_menu", async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply("🔍 请直接发送一个域名，例如：<code>example.com</code>", html);
+    await ctx.reply(commerceMenuText, { ...html, reply_markup: commerceMenuKeyboard() });
+  });
+
+  bot.callbackQuery("more_menu", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await ctx.reply(moreMenuText, { ...html, reply_markup: moreMenuKeyboard(config) });
   });
 
   bot.callbackQuery("check_another", async (ctx) => {
@@ -300,9 +312,9 @@ export function createBot(config: Config): Bot {
         domain: stored.report.domain,
         reportToken: token,
       }),
-      ctx.reply(`${previewReportText(stored.report)}\n\n${intentPromptText}`, {
+      ctx.reply(previewReportText(stored.report), {
         ...html,
-        reply_markup: intentKeyboard(token),
+        reply_markup: resultKeyboard(config, stored.report, token),
       }),
     ]);
   });
@@ -385,6 +397,24 @@ export function createBot(config: Config): Bot {
     }
     const { report, source } = stored;
     await ctx.answerCallbackQuery({ text: `已选择：${intentLabel(intent)}` });
+    if (intent !== "research") {
+      await backend.track({
+        eventName: "intent_selected",
+        telegramUserId: ctx.from.id,
+        source,
+        domain: report.domain,
+        reportToken: token,
+        intent,
+      });
+      await beginCommerce(
+        ctx,
+        intent === "owner" ? "sell" : report.rdap.status === "available" ? "register" : "buy",
+        report.domain,
+        token,
+        source,
+      );
+      return;
+    }
     const [membership] = await Promise.all([
       channelMembership(bot, config, ctx.from.id),
       backend.track({
@@ -399,7 +429,7 @@ export function createBot(config: Config): Bot {
     ]);
 
     if (membership === "member") {
-      await deliverFullReport(ctx, report, token, intent, source);
+      await deliverJuchaAccess(ctx, report, token, intent, source);
     } else if (membership === "unavailable") {
       await verificationUnavailable(ctx, report, token, intent, source);
     } else {
@@ -447,7 +477,7 @@ export function createBot(config: Config): Bot {
       ]);
       return;
     }
-    await deliverFullReport(ctx, report, token, intent, source);
+    await deliverJuchaAccess(ctx, report, token, intent, source);
   });
 
   bot.on("inline_query", async (ctx) => {
@@ -709,14 +739,14 @@ export function createBot(config: Config): Bot {
       const token = reports.put(userId, report);
       const persisted = await backend.saveReport({ reportToken: token, telegramUserId: userId, source, report });
       if (backend.enabled && !persisted) throw new Error("Report persistence failed");
-      const preview = `${previewReportText(report)}\n\n${intentPromptText}`;
+      const preview = previewReportText(report);
       try {
         await ctx.api.editMessageText(ctx.chat!.id, progress.message_id, preview, {
           ...html,
-          reply_markup: intentKeyboard(token),
+          reply_markup: resultKeyboard(config, report, token),
         });
       } catch {
-        await ctx.reply(preview, { ...html, reply_markup: intentKeyboard(token) });
+        await ctx.reply(preview, { ...html, reply_markup: resultKeyboard(config, report, token) });
       }
       await backend.track({
         eventName: "preview_shown",
@@ -772,7 +802,7 @@ export function createBot(config: Config): Bot {
     ]);
   }
 
-  async function deliverFullReport(
+  async function deliverJuchaAccess(
     ctx: Context,
     report: DomainReport,
     token: string,
@@ -788,9 +818,9 @@ export function createBot(config: Config): Bot {
         reportToken: token,
         intent,
       }),
-      ctx.reply(fullReportText(report, intent), {
+      ctx.reply(juchaAccessText(report), {
         ...html,
-        reply_markup: fullReportKeyboard(config, report, intent, token),
+        reply_markup: juchaAccessKeyboard(config, report, token),
       }),
     ]);
   }

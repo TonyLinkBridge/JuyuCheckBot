@@ -19,15 +19,13 @@ describe("commerce flow messages", () => {
     expect(text).toContain("委托购买 example.com");
     expect(text).toContain("预算范围");
     expect(buttons.map((button) => button.text)).toEqual([
-      "低于 ¥5,000",
-      "¥5,000–20,000",
+      "低于 ¥20,000",
       "¥20,000–100,000",
-      "¥100,000–500,000",
-      "¥500,000 以上",
+      "¥100,000 以上",
       "暂时不确定",
       "取消",
     ]);
-    expect(buttons[2]?.callback_data).toBe("commerce:choice:budget:20k_100k");
+    expect(buttons[1]?.callback_data).toBe("commerce:choice:budget:20k_100k");
   });
 
   it("lets sellers choose a quote instead of typing a price", () => {

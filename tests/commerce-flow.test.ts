@@ -17,14 +17,10 @@ describe("unified commerce flow", () => {
     if (started.kind !== "prompt") throw new Error("expected prompt");
 
     const budget = advanceCommerceChoice(started.session, "budget:20k_100k");
-    expect(budget).toMatchObject({ kind: "prompt", prompt: "buy_purpose" });
+    expect(budget).toMatchObject({ kind: "prompt", prompt: "buy_contact" });
     if (budget.kind !== "prompt") throw new Error("expected prompt");
 
-    const purpose = advanceCommerceChoice(budget.session, "purpose:brand");
-    expect(purpose).toMatchObject({ kind: "prompt", prompt: "buy_contact" });
-    if (purpose.kind !== "prompt") throw new Error("expected prompt");
-
-    const completed = advanceCommerceText(purpose.session, "微信：juyu-buyer");
+    const completed = advanceCommerceText(budget.session, "微信：juyu-buyer");
     expect(completed).toEqual({
       kind: "complete",
       lead: {
@@ -34,7 +30,6 @@ describe("unified commerce flow", () => {
           source: "channel",
           report_token: "report_123",
           budget: "CNY 20,000–100,000",
-          purpose: "品牌 / 企业",
           contact: "微信：juyu-buyer",
         },
       },
@@ -77,26 +72,16 @@ describe("unified commerce flow", () => {
     if (started.kind !== "prompt") throw new Error("expected prompt");
 
     const priced = advanceCommerceChoice(started.session, "price:quote");
-    expect(priced).toMatchObject({ kind: "prompt", prompt: "sell_negotiable" });
+    expect(priced).toMatchObject({ kind: "prompt", prompt: "sell_contact" });
     if (priced.kind !== "prompt") throw new Error("expected prompt");
 
-    const negotiable = advanceCommerceChoice(priced.session, "negotiable:maybe");
-    expect(negotiable).toMatchObject({ kind: "prompt", prompt: "sell_listed" });
-    if (negotiable.kind !== "prompt") throw new Error("expected prompt");
-
-    const listed = advanceCommerceChoice(negotiable.session, "listed:no");
-    expect(listed).toMatchObject({ kind: "prompt", prompt: "sell_contact" });
-    if (listed.kind !== "prompt") throw new Error("expected prompt");
-
-    expect(advanceCommerceText(listed.session, "WhatsApp +60 12-345 6789")).toMatchObject({
+    expect(advanceCommerceText(priced.session, "WhatsApp +60 12-345 6789")).toMatchObject({
       kind: "complete",
       lead: {
         leadType: "sell",
         data: {
           domain: "5so.cc",
           price: "待报价 / 面议",
-          negotiable: "看报价再决定",
-          listed: "否",
           contact: "WhatsApp +60 12-345 6789",
         },
       },
@@ -147,7 +132,7 @@ describe("unified commerce flow", () => {
 
     expect(resumeCommerceFlow(priced.session)).toEqual({
       kind: "prompt",
-      prompt: "sell_negotiable",
+      prompt: "sell_contact",
       session: priced.session,
     });
   });

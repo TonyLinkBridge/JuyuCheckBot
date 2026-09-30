@@ -38,15 +38,11 @@ export function commercePromptKeyboard(prompt: CommercePrompt): InlineKeyboard {
   switch (prompt) {
     case "buy_budget":
       keyboard
-        .text("低于 ¥5,000", "commerce:choice:budget:under_5k")
-        .row()
-        .text("¥5,000–20,000", "commerce:choice:budget:5k_20k")
+        .text("低于 ¥20,000", "commerce:choice:budget:under_20k")
         .row()
         .text("¥20,000–100,000", "commerce:choice:budget:20k_100k")
         .row()
-        .text("¥100,000–500,000", "commerce:choice:budget:100k_500k")
-        .row()
-        .text("¥500,000 以上", "commerce:choice:budget:over_500k")
+        .text("¥100,000 以上", "commerce:choice:budget:over_100k")
         .row()
         .text("暂时不确定", "commerce:choice:budget:unsure");
       break;
