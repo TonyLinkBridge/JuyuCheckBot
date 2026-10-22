@@ -44,7 +44,7 @@ import {
   referralWelcomeText,
   resultKeyboard,
   shareCardKeyboard,
-  shareCardText,
+  sharePreviewText,
   juchaHandoffLink,
   verificationUnavailableText,
   welcomeKeyboard,
@@ -119,7 +119,7 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
       if (isSelfReferral) {
         await Promise.all([
           ...startEvents,
-          ctx.reply(`👀 <b>这是你生成的分享页面</b>\n\n${shareCardText(sharedReferral.report)}`, {
+          ctx.reply(`👀 <b>这是你生成的分享页面</b>\n\n${sharePreviewText(sharedReferral.report)}`, {
             ...html,
             reply_markup: shareCardKeyboard(referralToken),
           }),
@@ -374,7 +374,7 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
         reportToken: token,
         intent,
       }),
-      ctx.reply(shareCardText(stored.report), {
+      ctx.reply(sharePreviewText(stored.report), {
         ...html,
         reply_markup: shareCardKeyboard(token),
       }),

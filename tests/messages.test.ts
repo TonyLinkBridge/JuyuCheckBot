@@ -227,7 +227,7 @@ describe("commerce lead messages", () => {
     expect(text).not.toContain("未发现明确警报");
   });
 
-  it("shows one result with three clear next actions instead of an intent questionnaire", () => {
+  it("keeps the existing next actions and makes sharing discoverable on the result", () => {
     const keyboard = resultKeyboard(config, report, "token_123").inline_keyboard;
     const buttons = keyboard.flat();
 
@@ -235,12 +235,19 @@ describe("commerce lead messages", () => {
       "🔓 解锁聚查完整资料",
       "🤝 我要购买这个域名",
       "💰 我要出售这个域名",
+      "📤 分享这份体检",
     ]);
     expect(buttons[0]?.callback_data).toBe("intent:research:token_123");
     expect(buttons[1]?.callback_data).toBe("lead:buyer:token_123");
     expect(buttons[2]?.callback_data).toBe("lead:owner:token_123");
     expect(buttons.some((button) => button.callback_data?.startsWith("refresh:"))).toBe(false);
-    expect(buttons.some((button) => button.callback_data?.startsWith("share:"))).toBe(false);
+    expect(buttons[3]?.callback_data).toBe("share:research:token_123");
+  });
+
+  it.each(["available", "unknown"] as const)("also allows sharing a %s registration result", (status) => {
+    const buttons = resultKeyboard(config, { ...report, rdap: { ...report.rdap, status } }, "token_123").inline_keyboard.flat();
+    expect(buttons.at(-1)).toMatchObject({ text: "📤 分享这份体检", callback_data: "share:research:token_123" });
+    expect(buttons.some((button) => button.callback_data === "lead:buyer:token_123")).toBe(true);
   });
 
   it("leads with a decision, evidence and JUYU action", () => {

@@ -98,16 +98,20 @@ export function resultKeyboard(
     .text("🔓 解锁聚查完整资料", `intent:research:${token}`);
 
   if (report.rdap.status === "available") {
-    return keyboard
+    keyboard
       .row()
       .text("🎯 请 JUYU 协助注册", `lead:buyer:${token}`);
+  } else {
+    keyboard
+      .row()
+      .text("🤝 我要购买这个域名", `lead:buyer:${token}`)
+      .row()
+      .text("💰 我要出售这个域名", `lead:owner:${token}`);
   }
 
   return keyboard
     .row()
-    .text("🤝 我要购买这个域名", `lead:buyer:${token}`)
-    .row()
-    .text("💰 我要出售这个域名", `lead:owner:${token}`);
+    .text("📤 分享这份体检", `share:research:${token}`);
 }
 
 export const intentPromptText = `为了给你真正有用的下一步：
@@ -332,6 +336,10 @@ export function shareCardKeyboard(token: string): InlineKeyboard {
     .switchInline("📤 分享带按钮的体检", `share_${token}`)
     .row()
     .text("🔎 继续体检", "check_another");
+}
+
+export function sharePreviewText(report: DomainReport): string {
+  return `${shareCardText(report)}\n\n<b>怎么分享？</b>\n点击下方分享按钮 → 选择聊天 → 点击出现的体检卡片发送。\n<i>不要直接发送输入框里的 @Bot 指令。公开分享不会显示你的 Telegram ID、联系方式或买卖意图。</i>`;
 }
 
 export function inlineShareResult(
