@@ -81,6 +81,8 @@ describe("commerce flow messages", () => {
         report_token: "report_123",
         price: "CNY 20,000",
         contact: "微信 seller&team",
+        submission_id: "internal-submission-key",
+        completion_update_id: 123456,
       },
     });
 
@@ -90,5 +92,7 @@ describe("commerce flow messages", () => {
     expect(text).toContain("期望售价：CNY 20,000");
     expect(text).toContain("联系方式：微信 seller&amp;team");
     expect(text).toContain("报告编号：report_123");
+    expect(text).not.toContain("internal-submission-key");
+    expect(text).not.toContain("completion_update_id");
   });
 });

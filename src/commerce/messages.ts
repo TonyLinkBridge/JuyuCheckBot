@@ -144,7 +144,7 @@ export function commerceAdminText(
     "",
   ];
   for (const [key, value] of Object.entries(lead.data)) {
-    if (value === undefined || value === "") continue;
+    if (!Object.hasOwn(labels, key) || value === undefined || value === "") continue;
     lines.push(`${labels[key] ?? escapeHtml(key)}：${escapeHtml(String(value))}`);
   }
   return lines.join("\n");
