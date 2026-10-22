@@ -29,6 +29,8 @@ import type { FollowUpItem } from "@/lib/follow-up";
 import { sourceLabel } from "@/lib/source-label";
 import { telegramContactUrl } from "@/lib/telegram-contact";
 import { cn } from "@/lib/utils";
+import { selectedVisibleUser } from "@/lib/user-selection";
+import type { BotHealth } from "@/lib/bot-health";
 
 type InboxFilter = "all" | "high" | "unlock" | "commercial";
 
@@ -68,7 +70,7 @@ const eventLabels: Record<string, string> = {
 
 const intentLabels = { buyer: "买家", owner: "持有人", research: "研究" } as const;
 
-export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData; activeSection: DashboardSectionId }) {
+export function FollowUpWorkspace({ data, activeSection, health }: { data: DashboardData; activeSection: DashboardSectionId; health: BotHealth }) {
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(data.followUp.items[0]?.telegramUserId ?? null);
@@ -86,7 +88,7 @@ export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData
     });
   }, [data.followUp.items, filter, query]);
 
-  const selected = data.followUp.items.find((item) => item.telegramUserId === selectedId) ?? filtered[0] ?? null;
+  const selected = selectedVisibleUser(filtered, selectedId);
   const events = useMemo(
     () => data.followUp.items
       .flatMap((item) => item.timeline.map((event) => ({ ...event, telegramUserId: item.telegramUserId })))
@@ -275,9 +277,9 @@ export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData
         </section> : null}
 
         {activeSection === "settings" ? <section className="ops-section ops-page-section system-strip">
-          <div><span className="system-dot" /> <strong>系统运行正常</strong><small>数据更新时间 {formatDateTime(data.generatedAt)}</small></div>
-          <div><span>Bot</span><strong>@JuyuCheckBot</strong></div>
-          <div><span>数据来源</span><strong>Supabase · Server-side</strong></div>
+          <div><span className="system-dot" style={health.status === "healthy" ? undefined : { background: "#d19b45" }} /> <strong>{health.status === "healthy" ? "当前检查通过" : health.status === "degraded" ? "检测到服务异常" : "暂时无法确认服务状态"}</strong><small>检测时间 {health.checkedAt ? formatDateTime(health.checkedAt) : "未取得"}</small></div>
+          {Object.entries(health.checks).map(([key, state]) => <div key={key}><span>{({ database: "数据库连接", commerce: "提交接口与权限", telegram: "Telegram API", webhook: "Webhook 与积压", notifications: "通知配置与队列" } as Record<string,string>)[key]}</span><strong>{state === "healthy" ? "检查通过" : state === "degraded" ? "需要处理" : "无法确认"}</strong></div>)}
+          <div><span>检查范围</span><small>只检查连接、权限与队列，不自动提交需求或试发通知；完整买卖流程须另行验收。</small></div>
         </section> : null}
       </div>
 

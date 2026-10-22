@@ -292,7 +292,7 @@ describe("unified commerce persistence", () => {
   });
 
   it("creates a Lead and returns its database ID", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: 28 }]), {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: 28, created: true }]), {
       status: 201,
       headers: { "Content-Type": "application/json" },
     }));
@@ -300,18 +300,18 @@ describe("unified commerce persistence", () => {
     const backend = createBackend(config());
     const lead: CommerceLead = {
       leadType: "sell",
-      data: { domain: "asset.cn", source: "channel", contact: "@seller" },
+      data: { submission_id: "test_submission_123456", domain: "asset.cn", source: "channel", contact: "@seller" },
     };
 
-    await expect(backend.createLead(123, "seller", lead)).resolves.toBe(28);
+    await expect(backend.createLead(123, "seller", lead)).resolves.toEqual({ id: 28, created: true });
 
-    expect(fetchMock.mock.calls[0]?.[0]).toContain("/rest/v1/leads");
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/rest/v1/rpc/create_lead_once");
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ Prefer: "return=representation" });
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-      lead_type: "sell",
-      telegram_user_id: 123,
-      username: "seller",
-      data: { domain: "asset.cn", source: "channel", contact: "@seller" },
+      p_lead_type: "sell",
+      p_telegram_user_id: 123,
+      p_username: "seller",
+      p_data: { submission_id: "test_submission_123456", domain: "asset.cn", source: "channel", contact: "@seller" },
     });
   });
 });

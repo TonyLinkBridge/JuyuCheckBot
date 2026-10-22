@@ -43,16 +43,16 @@
 
 ## 本地启动
 
-要求 Node.js 20 或更高版本。
+使用 Node.js 22.12 或更高的 22.x 版本（与 Vercel 保持一致）。
 
 ```bash
 npm install
 cp .env.example .env
-# 编辑 .env，至少填写 BOT_TOKEN
+# 使用独立测试 Bot Token，并明确设置 LOCAL_POLLING=true
 npm run dev
 ```
 
-没有填写 `WEBHOOK_URL` 时使用 long polling。填写后在本地服务器模式使用 webhook，健康检查地址为 `/health`。
+本地默认拒绝启动 Bot。即使启用 `LOCAL_POLLING=true`，发现已配置或线上已有 Webhook 也会拒绝，不会自动修改 Webhook 或命令菜单。允许的本地测试仅使用安全的 `getUpdates` 循环；正式 Webhook 只由显式的 `webhook:set` 操作配置。
 
 ## 部署到 Vercel
 
@@ -83,7 +83,7 @@ Vercel 会把 `src/index.ts` 识别为 Express Function。生产环境只处理 
 5. 部署成功后先打开 `https://你的正式域名/health`，应返回：
 
    ```json
-   { "ok": true, "service": "juyu-domain-check", "version": "0.16.0", "reportVersion": "JUYU-EVIDENCE-3.2", "dataPolicy": "registry-and-dns" }
+   { "ok": true, "status": "healthy", "checkedAt": "...", "checks": { "database": "healthy", "commerce": "healthy", "telegram": "healthy", "webhook": "healthy", "notifications": "healthy" } }
    ```
 
 6. 确保本地 `.env` 使用与 Vercel 相同的 `BOT_TOKEN` 和 `WEBHOOK_SECRET`，执行一次：
@@ -184,6 +184,16 @@ ICP 备案、中国商标、国内平台风险、网站历史、搜索表现和�
 自动重试使用免费的 Supabase Cron + pg_net，每五分钟只在有到期任务时调用 Bot 的 `POST /internal/lead-notifications`。该接口拒绝未授权请求。使用 `src/commerce/notification-auth.ts` 中的算法从生产 `WEBHOOK_SECRET` 派生专用令牌，存入 Supabase Vault 的 `juyu_lead_notification_token`，再执行 `supabase/lead-notification-scheduler.sql`。不要把 Bot Token 或专用令牌写进 SQL 文件或 Git。生产 `WEBHOOK_SECRET` 更换时须同步更新 Vault 中的派生令牌。
 
 用户每次私聊操作都会更新活跃时间；未完成表单超过 24 小时失效。自动清理只删除超过保留期限的报告、行为及无关联记录的闲置用户，不通过删除用户来连带删除客户 Lead。用户主动请求删除资料的功能保持不变。
+
+### 防重复、登录与健康检测升级
+
+部署当前代码前须执行 `supabase/production-hardening.sql`，再运行 `supabase/tests/production-hardening.sql`。升级只新增私有表、字段及函数，保留所有旧 Lead；测试在事务内回滚，不会发送通知。
+
+同一表单通过数据库事务只创建一条 Lead；已完成的 Telegram 更新持久去重，旧消息重试不能误改后来发起的表单。只有匹配表单会在提交事务中清除，通知仍使用既有队列。
+
+Dashboard 登录采用随机签名会话、服务端 7 天有效期和数据库撤销；退出后当前会话失效，更换访问密码也会使旧会话失效。每个来源地址在 15 分钟内最多尝试 5 次登录，计数跨实例共享且不保存原始 IP；验证服务不可用时拒绝登录。升级会要求管理员重新登录，不需要更换密码。
+
+`/health` 真实检查数据库访问、提交及队列所需权限、Telegram API、Webhook 地址与积压、管理员配置及超时任务，异常返回 HTTP 503。结果最多复用 15 秒；不会创建需求或试发通知，也不保证外部注册局可用或完整交易流程已验收。Dashboard 显示每项结果与检测时间；无法读取时显示“状态未确认”，不固定亮绿灯。可用 `BOT_HEALTH_URL` 指定独立部署的健康地址。
 
 ## 合并上线顺序
 

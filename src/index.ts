@@ -7,9 +7,10 @@ import { REPORT_VERSION } from "./domain/evidence.js";
 import type { DomainIntent } from "./domain/types.js";
 import { juchaDomainLink } from "./messages.js";
 import { landingHtml, privacyHtml } from "./privacy.js";
-import { TELEGRAM_ALLOWED_UPDATES } from "./telegram.js";
 import { dispatchLeadNotifications } from "./commerce/notifications.js";
 import { notificationWorkerAuthorized } from "./commerce/notification-auth.js";
+import { assertLocalPollingSafe, runSafeLocalPolling } from "./local-runtime.js";
+import { checkSystemHealth, type SystemHealth } from "./health.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
 
@@ -65,9 +66,13 @@ app.get("/go/jucha", async (request, response) => {
 
   response.redirect(302, juchaDomainLink(config.JUCHA_URL, domain, intent));
 });
-app.get("/health", (_request, response) => {
-  response.status(200).json({
-    ok: true,
+let healthCache: { value: SystemHealth; expiresAt: number } | null = null;
+app.get("/health", async (_request, response) => {
+  const health = healthCache && healthCache.expiresAt > Date.now() ? healthCache.value
+    : await checkSystemHealth(config, backend, bot.api);
+  healthCache = { value: health, expiresAt: Date.now() + 15_000 };
+  response.set("Cache-Control", "no-store").status(health.ok ? 200 : 503).json({
+    ...health,
     service: "juyu-domain-check",
     version: "0.16.0",
     reportVersion: REPORT_VERSION,
@@ -102,33 +107,12 @@ if (process.env.VERCEL !== "1") {
 }
 
 async function startLocalProcess(): Promise<void> {
-  await bot.api.setMyCommands([
-    { command: "start", description: "开始域名体检" },
-    { command: "check", description: "体检一个域名" },
-    { command: "buy", description: "委托购买域名" },
-    { command: "sell", description: "提交出售域名" },
-    { command: "register", description: "协助注册域名" },
-    { command: "contact", description: "联系 JUYU" },
-    { command: "cancel", description: "取消当前提交" },
-    { command: "help", description: "查看使用说明" },
-    { command: "recent", description: "查看最近体检" },
-    { command: "privacy", description: "隐私与数据删除" },
-  ]);
-
-  if (config.WEBHOOK_URL && config.WEBHOOK_SECRET) {
-    await bot.api.setWebhook(`${config.WEBHOOK_URL}${TELEGRAM_WEBHOOK_PATH}`, {
-      secret_token: config.WEBHOOK_SECRET,
-      allowed_updates: TELEGRAM_ALLOWED_UPDATES,
-    });
-    app.listen(config.PORT, () => console.log(`JUYU Domain Check webhook listening on :${config.PORT}`));
-    return;
-  }
-
-  await bot.api.deleteWebhook({ drop_pending_updates: false });
-  bot.start({
-    allowed_updates: TELEGRAM_ALLOWED_UPDATES,
-    onStart: () => console.log("JUYU Domain Check bot started with long polling"),
-  });
+  // Refuse before any Telegram mutation, including command/menu synchronisation.
+  assertLocalPollingSafe(process.env, config.WEBHOOK_URL ?? "");
+  const shutdown = new AbortController();
+  process.once("SIGINT", () => shutdown.abort());
+  process.once("SIGTERM", () => shutdown.abort());
+  await runSafeLocalPolling(bot, process.env, shutdown.signal);
 }
 
 export default app;

@@ -1,4 +1,5 @@
 import { Bot, Context, GrammyError, HttpError, InlineKeyboard } from "grammy";
+import { randomUUID } from "node:crypto";
 import { AttributionStore, sourceFromStartPayload } from "./attribution.js";
 import { createBackend, type Backend, type StoredReport } from "./backend.js";
 import { advanceCommerceChoice, advanceCommerceText, commerceSessionExpired, domainQueryInput, resumeCommerceFlow, startCommerceFlow } from "./commerce/flow.js";
@@ -65,6 +66,14 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
 
   bot.use(async (ctx, next) => {
     if (!updates.accept(ctx.update.update_id)) return;
+    if (ctx.chat?.type === "private" && ctx.from) {
+      try {
+        if (await backend.isCompletedUpdate(ctx.from.id, ctx.update.update_id)) return;
+      } catch {
+        await ctx.reply("暂时无法确认这次操作，请稍后重试。", html);
+        return;
+      }
+    }
     // /start resolves its attribution before identifying the user. Every other
     // private interaction also creates/refreshes the profile before child writes.
     const isStart = ctx.message?.text && /^\/start(?:@\w+)?(?:\s|$)/i.test(ctx.message.text);
@@ -564,6 +573,7 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
       return;
     }
     if (transition.kind !== "prompt") return;
+    transition.session.data.submission_id = randomUUID();
     const saved = await backend.saveCommerceSession(userId, transition.session);
     if (!saved) {
       await backend.track({ eventName: "lead_start_failed", telegramUserId: userId, source,
@@ -636,16 +646,19 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
   async function completeCommerce(ctx: Context, lead: Extract<CommerceTransition, { kind: "complete" }>["lead"]): Promise<void> {
     const from = ctx.from;
     if (!from) return;
-    const leadId = await backend.createLead(from.id, from.username, lead);
-    if (leadId === null) {
+    const savedLead = await backend.createLead(from.id, from.username, {
+      ...lead, data: { ...lead.data, completion_update_id: ctx.update.update_id },
+    });
+    if (savedLead === null) {
       await backend.track({ eventName: "lead_submit_failed", telegramUserId: from.id, source: lead.data.source,
         domain: lead.data.domain, reportToken: lead.data.report_token, intent: commerceIntent(lead.leadType) });
       await ctx.reply("⚠️ 资料暂时无法提交。你的当前步骤已经保留，请稍后再试。", html);
       return;
     }
+    const leadId = savedLead.id;
     const source = lead.data.source;
     const action = lead.data.service === "register" ? "register" : lead.leadType;
-    const submitted = backend.track({
+    const submitted = savedLead.created ? backend.track({
       eventName: "lead_submitted",
       telegramUserId: from.id,
       source,
@@ -653,12 +666,11 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
       reportToken: lead.data.report_token,
       intent: commerceIntent(action),
       metadata: { action, leadId },
-    });
-    await backend.track({ eventName: "lead_notification_pending", telegramUserId: from.id, source,
+    }) : Promise.resolve();
+    if (savedLead.created) await backend.track({ eventName: "lead_notification_pending", telegramUserId: from.id, source,
       domain: lead.data.domain, reportToken: lead.data.report_token, intent: commerceIntent(action), metadata: { leadId, action } });
     // A failed user receipt must never prevent the independently queued admin delivery.
     const outcomes = await Promise.allSettled([
-      backend.clearCommerceSession(from.id),
       submitted,
       ctx.reply(commerceCompleteText(leadId, lead), {
         ...html,

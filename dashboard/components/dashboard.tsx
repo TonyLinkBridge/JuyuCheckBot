@@ -6,11 +6,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { rangeOptions, type DashboardData } from "@/lib/dashboard-data";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/dashboard-sections";
 import { cn } from "@/lib/utils";
+import { loadBotHealth } from "@/lib/bot-health";
 
-export function Dashboard({ data, activeSection }: { data: DashboardData; activeSection: DashboardSectionId }) {
+export async function Dashboard({ data, activeSection }: { data: DashboardData; activeSection: DashboardSectionId }) {
+  const health = await loadBotHealth();
   return (
     <div className="dashboard-shell">
-      <AppSidebar followUpCount={data.followUp.summary.total} qualityAlerts={qualityAlertCount(data)} />
+      <AppSidebar followUpCount={data.followUp.summary.total} qualityAlerts={qualityAlertCount(data)} health={health} />
       <main className="dashboard-main">
         <Topbar data={data} activeSection={activeSection} />
         {data.error ? (
@@ -19,7 +21,7 @@ export function Dashboard({ data, activeSection }: { data: DashboardData; active
             {data.error}。界面仍可使用，连接恢复后会自动显示最新数据。
           </div>
         ) : null}
-        <FollowUpWorkspace data={data} activeSection={activeSection} />
+        <FollowUpWorkspace data={data} activeSection={activeSection} health={health} />
       </main>
     </div>
   );

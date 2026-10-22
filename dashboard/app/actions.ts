@@ -7,15 +7,18 @@ import {
   dashboardAuthConfigured,
   requireDashboardSession,
   verifyPassword,
+  checkDashboardLoginLimit,
 } from "@/lib/auth";
 import { parsePollFormData, sourcePayload, type PollActionState } from "@/lib/poll";
 import { sendTelegramPoll } from "@/lib/telegram-publisher";
 
 export async function login(formData: FormData): Promise<void> {
   if (!dashboardAuthConfigured()) redirect("/login?error=configuration");
+  const limit = await checkDashboardLoginLimit();
+  if (limit !== "allowed") redirect(`/login?error=${limit}`);
   const password = String(formData.get("password") ?? "");
   if (!verifyPassword(password)) redirect("/login?error=invalid");
-  await createDashboardSession();
+  try { await createDashboardSession(); } catch { redirect("/login?error=unavailable"); }
   redirect("/");
 }
 

@@ -11,6 +11,8 @@ export type CommerceStep =
   | "message";
 
 export type CommerceData = {
+  submission_id?: string;
+  completion_update_id?: number;
   domain?: string;
   source: string;
   report_token?: string;

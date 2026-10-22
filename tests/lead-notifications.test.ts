@@ -19,7 +19,9 @@ describe("durable Lead notifications", () => {
       if (attempts === 1) throw new Error("Temporary Telegram failure");
       return { ok: true, result: {} } as never;
     });
-    await backend.createLead(9001, "test_user", { leadType: "buy", data: { source: "test", domain: "example.com", contact: "@test_user" } });
+    const data = { submission_id: "test_notification_1234", source: "test", domain: "example.com", contact: "@test_user" };
+    await backend.saveCommerceSession(9001, { flow: "buy", step: "contact", data });
+    await backend.createLead(9001, "test_user", { leadType: "buy", data });
     expect(await dispatchLeadNotifications(backend, api, config)).toEqual({ claimed: 1, sent: 0 });
     expect(await dispatchLeadNotifications(backend, api, config)).toEqual({ claimed: 0, sent: 0 });
     vi.setSystemTime(Date.now() + 61_000);
@@ -31,7 +33,9 @@ describe("durable Lead notifications", () => {
   it("rejects stale worker completion after the lease is reclaimed", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const backend = createBackend(loadConfig({ BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz" }));
-    await backend.createLead(9001, undefined, { leadType: "contact", data: { source: "test", message: "Test" } });
+    const data = { submission_id: "test_notification_5678", source: "test", message: "Test" };
+    await backend.saveCommerceSession(9001, { flow: "contact", step: "message", data });
+    await backend.createLead(9001, undefined, { leadType: "contact", data });
     const [old] = await backend.claimLeadNotifications(3);
     expect(await backend.claimLeadNotifications(3)).toHaveLength(0);
     vi.setSystemTime(Date.now() + 301_000);

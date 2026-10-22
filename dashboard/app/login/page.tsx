@@ -40,6 +40,8 @@ export default async function LoginPage({
             />
           </div>
           {error === "invalid" ? <p className="form-error">密码不正确，请重试。</p> : null}
+          {error === "limited" ? <p className="form-error">尝试次数过多，请在 15 分钟后重试。</p> : null}
+          {error === "unavailable" ? <p className="form-error">登录验证暂时不可用，请稍后重试。</p> : null}
           {(!configured || error === "configuration") ? (
             <p className="form-error">Dashboard 尚未配置访问密码。</p>
           ) : null}

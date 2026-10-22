@@ -4,6 +4,7 @@ import { buildEvidence } from "./domain/evidence.js";
 import { emptyIntelligence } from "./domain/intelligence.js";
 import type { DomainIntent, DomainReport } from "./domain/types.js";
 import { sourceLabel } from "./source-label.js";
+import type { DatabaseReadiness } from "./health.js";
 
 export type GrowthEventName =
   | "bot_started"
@@ -65,6 +66,8 @@ export type UserIdentity = {
   isNew: boolean;
 };
 
+export type LeadCreationResult = { id: number; created: boolean };
+
 export type TelegramPublicProfile = {
   username?: string;
   firstName?: string;
@@ -77,6 +80,8 @@ export type RateLimitResult =
 
 export interface Backend {
   enabled: boolean;
+  isCompletedUpdate(telegramUserId: number, updateId: number): Promise<boolean>;
+  getReadiness(): Promise<DatabaseReadiness | null>;
   track(event: GrowthEvent): Promise<void>;
   identifyUser(telegramUserId: number, source: string, profile?: TelegramPublicProfile): Promise<UserIdentity>;
   getUserSource(telegramUserId: number): Promise<string | null>;
@@ -90,7 +95,7 @@ export interface Backend {
   saveCommerceSession(telegramUserId: number, session: CommerceSession): Promise<boolean>;
   getCommerceSession(telegramUserId: number): Promise<CommerceSession | null>;
   clearCommerceSession(telegramUserId: number): Promise<boolean>;
-  createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<number | null>;
+  createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<LeadCreationResult | null>;
   claimLeadNotifications(limit: number, leadId?: number, now?: Date): Promise<LeadNotificationJob[]>;
   finishLeadNotification(job: LeadNotificationJob, sent: boolean): Promise<boolean>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
@@ -99,9 +104,15 @@ export interface Backend {
 
 class MemoryBackend implements Backend {
   enabled = false;
+  async isCompletedUpdate(telegramUserId: number, updateId: number): Promise<boolean> {
+    return this.completedUpdates.has(`${telegramUserId}:${updateId}`);
+  }
+  async getReadiness(): Promise<null> { return null; }
   private readonly users = new Set<number>();
   private readonly commerceSessions = new Map<number, CommerceSession>();
   private nextLeadId = 1;
+  private readonly submissionLeads = new Map<string, number>();
+  private readonly completedUpdates = new Map<string, number>();
   private readonly notifications = new Map<number, { job: LeadNotificationJob; state: "pending" | "processing" | "sent"; due: number }>();
 
   async track(): Promise<void> {}
@@ -159,10 +170,26 @@ class MemoryBackend implements Backend {
     return true;
   }
 
-  async createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<number> {
+  async createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<LeadCreationResult | null> {
+    if (!lead.data.submission_id) return null;
+    const updateKey = lead.data.completion_update_id === undefined ? null : `${telegramUserId}:${lead.data.completion_update_id}`;
+    const completed = updateKey ? this.completedUpdates.get(updateKey) : undefined;
+    if (completed !== undefined) return { id: completed, created: false };
+    const key = `${telegramUserId}:${lead.data.submission_id}`;
+    const existing = this.submissionLeads.get(key);
+    if (existing !== undefined) {
+      if (updateKey) this.completedUpdates.set(updateKey, existing);
+      return { id: existing, created: false };
+    }
+    if (this.commerceSessions.get(telegramUserId)?.data.submission_id !== lead.data.submission_id) return null;
     const leadId = this.nextLeadId++;
+    this.submissionLeads.set(key, leadId);
+    if (updateKey) this.completedUpdates.set(updateKey, leadId);
+    if (this.commerceSessions.get(telegramUserId)?.data.submission_id === lead.data.submission_id) {
+      this.commerceSessions.delete(telegramUserId);
+    }
     this.notifications.set(leadId, { job: { leadId, telegramUserId, username, lead: structuredClone(lead), attempts: 0 }, state: "pending", due: Date.now() });
-    return leadId;
+    return { id: leadId, created: true };
   }
 
   async claimLeadNotifications(limit: number, leadId?: number, now = new Date()): Promise<LeadNotificationJob[]> {
@@ -189,6 +216,8 @@ class MemoryBackend implements Backend {
   async deleteUserData(telegramUserId: number): Promise<boolean> {
     this.users.delete(telegramUserId);
     this.commerceSessions.delete(telegramUserId);
+    for (const key of this.submissionLeads.keys()) if (key.startsWith(`${telegramUserId}:`)) this.submissionLeads.delete(key);
+    for (const key of this.completedUpdates.keys()) if (key.startsWith(`${telegramUserId}:`)) this.completedUpdates.delete(key);
     for (const [id, item] of this.notifications) if (item.job.telegramUserId === telegramUserId) this.notifications.delete(id);
     return true;
   }
@@ -198,6 +227,17 @@ class MemoryBackend implements Backend {
 
 class SupabaseBackend implements Backend {
   enabled = true;
+  async isCompletedUpdate(telegramUserId: number, updateId: number): Promise<boolean> {
+    const rows = await this.readRows(`lead_completion_updates?telegram_user_id=eq.${telegramUserId}&update_id=eq.${updateId}&select=lead_id&limit=1`);
+    if (!rows) throw new Error("Unable to verify completed update");
+    return rows.length > 0;
+  }
+  async getReadiness(): Promise<DatabaseReadiness | null> {
+    const rows = await this.readRows("rpc/bot_readiness");
+    const row = rows?.[0];
+    return row && typeof row.database_ok === "boolean" && typeof row.commerce_ok === "boolean"
+      && typeof row.stale_notifications === "number" ? row as DatabaseReadiness : null;
+  }
   private readonly perMinuteLimit = 5;
   private readonly perDayLimit = 30;
 
@@ -421,7 +461,7 @@ class SupabaseBackend implements Backend {
   async getCommerceSession(telegramUserId: number): Promise<CommerceSession | null> {
     const query = new URLSearchParams({
       telegram_user_id: `eq.${telegramUserId}`,
-      select: "flow,step,data,updated_at",
+      select: "telegram_user_id,flow,step,data,updated_at",
       limit: "1",
     });
     const rows = await this.readRows(`bot_sessions?${query}`);
@@ -436,15 +476,17 @@ class SupabaseBackend implements Backend {
     telegramUserId: number,
     username: string | undefined,
     lead: CommerceLead,
-  ): Promise<number | null> {
-    const rows = await this.writeRows("leads", {
-      lead_type: lead.leadType,
-      telegram_user_id: telegramUserId,
-      username: cleanTelegramText(username)?.replace(/^@/, "") ?? "",
-      data: lead.data,
+  ): Promise<LeadCreationResult | null> {
+    if (!lead.data.submission_id) return null;
+    const rows = await this.writeRows("rpc/create_lead_once", {
+      p_lead_type: lead.leadType,
+      p_telegram_user_id: telegramUserId,
+      p_username: cleanTelegramText(username)?.replace(/^@/, "") ?? "",
+      p_data: lead.data,
     });
     const id = rows?.[0]?.id;
-    return typeof id === "number" && Number.isSafeInteger(id) ? id : null;
+    return typeof id === "number" && Number.isSafeInteger(id) && typeof rows?.[0]?.created === "boolean"
+      ? { id, created: rows[0].created } : null;
   }
 
   async claimLeadNotifications(limit: number, leadId?: number): Promise<LeadNotificationJob[]> {
@@ -574,6 +616,11 @@ function parseCommerceSession(row: Record<string, unknown>): CommerceSession | n
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const source = (data as Record<string, unknown>).source;
   if (typeof source !== "string" || !source) return null;
+  if (!(data as Record<string, unknown>).submission_id && typeof row.telegram_user_id === "number" && typeof row.updated_at === "string") {
+    const timestamp = Date.parse(row.updated_at);
+    if (!Number.isFinite(timestamp)) return null;
+    (data as Record<string, unknown>).submission_id = `legacy_${row.telegram_user_id}_${timestamp}`;
+  }
   return { flow, step, data, ...(typeof row.updated_at === "string" ? { updatedAt: row.updated_at } : {}) } as CommerceSession;
 }
 
