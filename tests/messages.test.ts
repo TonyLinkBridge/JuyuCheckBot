@@ -211,6 +211,22 @@ describe("commerce lead messages", () => {
     expect(text).toContain("购买前仍需继续核对历史、商标和市场资料");
   });
 
+  it("explains each preview reminder instead of showing only a count", () => {
+    const text = previewReportText({ ...report, alerts: ["距离到期不足 30 天"] });
+    expect(text).toContain("距离到期不足 30 天");
+    expect(text).toContain("联系注册商确认续费");
+    expect(text).toContain("DNSSEC 未启用");
+    expect(text).toContain("不代表网站一定不安全");
+  });
+
+  it("separates missing information from confirmed technical warnings", () => {
+    const text = previewReportText({ ...report, rdap: { ...report.rdap, status: "unknown", dnssec: null, expiresAt: null }, dns: { ...report.dns, checked: false, resolves: false }, alerts: ["注册状态暂时无法从可用资料源确认"] });
+    expect(text).toContain("资料缺失");
+    expect(text).toContain("不能判断是否可注册");
+    expect(text).toContain("查询未完成");
+    expect(text).not.toContain("未发现明确警报");
+  });
+
   it("shows one result with three clear next actions instead of an intent questionnaire", () => {
     const keyboard = resultKeyboard(config, report, "token_123").inline_keyboard;
     const buttons = keyboard.flat();

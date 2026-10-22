@@ -44,6 +44,17 @@ function harness(options: { failReceipt?: boolean; failAdmin?: boolean } = {}) {
 }
 
 describe("core user and commerce journeys", () => {
+  it("opens the main menu with /menu and cancels a pending sale with /cancel", async () => {
+    const h = harness();
+    await h.text("/sell example.org");
+    await h.text("/menu");
+    expect(h.sent.at(-1)?.keyboard).toMatchObject({ inline_keyboard: expect.arrayContaining([
+      expect.arrayContaining([expect.objectContaining({ callback_data: "start_check" })]),
+    ]) });
+    await h.text("/cancel");
+    expect(await h.backend.getCommerceSession(9001)).toBeNull();
+    expect(h.leads).not.toHaveBeenCalled();
+  });
   it("ignores a completed update before it can change a newer form's price", async () => {
     const h = harness();
     await h.text("/register example.com");

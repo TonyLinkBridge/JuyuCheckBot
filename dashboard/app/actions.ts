@@ -11,6 +11,21 @@ import {
 } from "@/lib/auth";
 import { parsePollFormData, sourcePayload, type PollActionState } from "@/lib/poll";
 import { sendTelegramPoll } from "@/lib/telegram-publisher";
+import { parseLeadUpdate, type LeadActionState } from "@/lib/lead-follow-up";
+import { saveLeadFollowUp } from "@/lib/lead-follow-up-store";
+import { revalidatePath } from "next/cache";
+
+export async function updateLeadFollowUp(_previous: LeadActionState, formData: FormData): Promise<LeadActionState> {
+  await requireDashboardSession();
+  const update = parseLeadUpdate(formData);
+  if (!update) return { status: "error", message: "资料不完整或格式有误，备注最多 2000 字。" };
+  const outcome = await saveLeadFollowUp(update);
+  if (outcome === "conflict") return { status: "error", message: "这条线索已被其他页面更新。请先刷新，核对最新资料后再保存。" };
+  if (outcome === "not_found") return { status: "error", message: "线索不存在或不属于当前数据库，未作修改。" };
+  if (outcome !== "saved") return { status: "error", message: "无法确认是否保存。请先复制当前备注，再刷新核对最新记录，避免重复操作。" };
+  revalidatePath("/leads");
+  return { status: "saved", message: "已保存跟进资料。" };
+}
 
 export async function login(formData: FormData): Promise<void> {
   if (!dashboardAuthConfigured()) redirect("/login?error=configuration");

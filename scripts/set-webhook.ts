@@ -2,6 +2,7 @@ import "dotenv/config";
 import { Bot } from "grammy";
 import { loadConfig } from "../src/config.js";
 import { TELEGRAM_ALLOWED_UPDATES } from "../src/telegram.js";
+import { syncBotMenu } from "../src/telegram-menu.js";
 
 const WEBHOOK_PATH = "/telegram/webhook";
 const config = loadConfig();
@@ -19,18 +20,7 @@ const url = new URL(baseUrl);
 if (url.protocol !== "https:") throw new Error("Webhook 必须使用 HTTPS URL");
 
 const bot = new Bot(config.BOT_TOKEN);
-await bot.api.setMyCommands([
-  { command: "start", description: "开始域名体检" },
-  { command: "check", description: "体检一个域名" },
-  { command: "buy", description: "委托购买域名" },
-  { command: "sell", description: "提交出售域名" },
-  { command: "register", description: "协助注册域名" },
-  { command: "contact", description: "联系 JUYU" },
-  { command: "cancel", description: "取消当前提交" },
-  { command: "help", description: "查看使用说明" },
-  { command: "recent", description: "查看最近体检" },
-  { command: "privacy", description: "隐私与数据删除" },
-]);
+await syncBotMenu(bot.api);
 await bot.api.setWebhook(`${url.origin}${WEBHOOK_PATH}`, {
   secret_token: config.WEBHOOK_SECRET,
   allowed_updates: TELEGRAM_ALLOWED_UPDATES,

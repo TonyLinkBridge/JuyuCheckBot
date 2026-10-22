@@ -50,7 +50,7 @@ describe("Dashboard Supabase reads", () => {
     const data = await getDashboardData("7d");
 
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).origin))
-      .toEqual([primaryUrl, primaryUrl, primaryUrl, primaryUrl]);
+      .toEqual([primaryUrl, primaryUrl, primaryUrl, primaryUrl, primaryUrl]);
     expect(data.leads.commerceError).toBeNull();
     expect(data.leads.submittedLeads).toBe(1);
     expect(data.leads.records[0]).toMatchObject({ stableKey: "check:6", domain: "example.com", telegramUserId: 7001 });
@@ -84,6 +84,38 @@ describe("Dashboard Supabase reads", () => {
 
     expect(data.leads.commerceConfigured).toBe(false);
     expect(data.leads.commerceError).toBeTruthy();
+    expect(data.leads.submittedLeads).toBe(0);
+  });
+
+  it("keeps test applications visible but excludes them from submitted Lead totals", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/leads")) return Response.json([
+        { ...primaryLead, data: { ...primaryLead.data, budget: "CNY 5,000–20,000", purpose: "品牌", source: "channel" } },
+        { ...primaryLead, id: 7, lead_type: "sell", data: { domain: "example.org", price: "CNY 2000", contact: "@seller", source: "direct" } },
+      ]);
+      if (url.pathname.endsWith("/lead_followups")) return Response.json([
+        { lead_id: 7, status: "contacted", notes: "验收测试", is_test: true, revision: 1, updated_at: "2026-10-22T08:30:00Z" },
+      ]);
+      return Response.json([]);
+    }));
+    const data = await getDashboardData("7d");
+    expect(data.leads.submittedLeads).toBe(1);
+    expect(data.leads.buyLeads).toBe(1);
+    expect(data.leads.sellLeads).toBe(0);
+    expect(data.leads.records).toHaveLength(2);
+    expect(data.leads.records.find((lead) => lead.id === 6)).toMatchObject({ budget: "CNY 5,000–20,000", purpose: "品牌", source: "channel", isTest: false, followUpStatus: "new", revision: 0 });
+    expect(data.leads.records.find((lead) => lead.id === 7)).toMatchObject({ price: "CNY 2000", isTest: true, notes: "验收测试", followUpStatus: "contacted", revision: 1 });
+  });
+
+  it("does not publish real Lead totals when test classifications cannot be loaded", async () => {
+    mockDatabase();
+    const databaseFetch = fetch;
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request, init?: RequestInit) =>
+      String(input).includes("/lead_followups") ? Promise.resolve(new Response("unavailable", { status: 503 })) : databaseFetch(input, init)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const data = await getDashboardData("7d");
+    expect(data.leads.commerceError).toContain("跟进资料");
     expect(data.leads.submittedLeads).toBe(0);
   });
 });

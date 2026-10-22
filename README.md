@@ -145,7 +145,7 @@ npm run dashboard:dev
 6. 用 `/setinline` 选择 `@JuyuCheckBot`，将 Placeholder 设置为：`分享一份 JUYU 域名体检`。这是让分享卡附带按钮所必需的一次性设置。
 7. 将部署平台环境变量中的频道、Bot 用户名与公网 Webhook 地址改成真实值。
 
-命令菜单会在进程启动时自动设置：`/start`、`/check`、`/buy`、`/sell`、`/register`、`/contact`、`/cancel`、`/help`、`/recent`、`/privacy`。
+命令菜单不会随启动或部署自动更新。部署成功后执行 `npm run menu:sync`，单独同步默认和私聊菜单，不更改 Webhook。命令包含 `/start`、`/menu`、`/check`、`/buy`、`/sell`、`/register`、`/contact`、`/cancel`、`/help`、`/recent`、`/privacy`。
 
 ## 旧 Commerce Bot 过渡约定
 
@@ -196,6 +196,14 @@ Dashboard 登录采用随机签名会话、服务端 7 天有效期和数据库�
 `/health` 真实检查数据库访问、提交及队列所需权限、Telegram API、Webhook 地址与积压、管理员配置及超时任务，异常返回 HTTP 503。结果最多复用 15 秒；不会创建需求或试发通知，也不保证外部注册局可用或完整交易流程已验收。Dashboard 显示每项结果与检测时间；无法读取时显示“状态未确认”，不固定亮绿灯。可用 `BOT_HEALTH_URL` 指定独立部署的健康地址。
 
 ## 合并上线顺序
+
+### 商业线索跟进升级
+
+部署本轮后台前，在目前的 Check Bot Supabase 执行 `supabase/lead-follow-up.sql`，再运行 `supabase/tests/lead-follow-up.sql`（事务回滚验收，不发送通知）。这是独立增量升级；不要为此重跑基础 schema 的历史数据清理语句。
+
+商业 Leads 可查看原始提交的预算、售价、用途、联系方式、挂牌／议价资料及来源；未填写的字段明确显示“未提供”，不会向客户追加提问。后台跟进状态、备注和手动测试标记存于独立私有表，不修改原始需求 JSON，不触发管理员通知。只有通过 Dashboard 会话校验的服务器操作能写入，旧 Commerce 历史仍只读。
+
+默认展示真实线索；测试记录可单独查看，计数只从商业 Lead 统计中排除，不会删记录或把该用户全部行为过滤。用户、来源与增长页面仍保留原始行为。多页面同时编辑通过版本号拒绝旧页面覆盖；遇到冲突须刷新核对。跟进数据无法读取时明确报错，不展示可能混入测试数据的商业统计。
 
 1. 在 Check Bot Supabase 运行最新版 `supabase/schema.sql`。
 2. 在 Check Bot Vercel Project 新增 `ADMIN_CHAT_ID`，保留现有 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。

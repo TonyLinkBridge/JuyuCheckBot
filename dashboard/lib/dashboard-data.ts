@@ -1,6 +1,7 @@
 import "server-only";
 import { buildFollowUpInbox, type FollowUpEvent, type FollowUpInbox, type FollowUpProfile } from "@/lib/follow-up";
 import { normalizeCommerceLeads, type CommerceLeadRow, type RawCommerceLeadRow } from "@/lib/lead-sources";
+import type { LeadFollowUp, RawLeadFollowUp } from "@/lib/lead-follow-up";
 
 const CURRENT_REPORT_VERSION = "JUYU-EVIDENCE-3.2";
 
@@ -103,9 +104,16 @@ export type DashboardData = {
       username: string | null;
       domain: string | null;
       contact: string | null;
+      budget: string | null;
+      price: string | null;
+      purpose: string | null;
+      negotiable: string | null;
+      listed: string | null;
+      message: string | null;
+      source: string;
       status: string;
       createdAt: string;
-    }>;
+    } & LeadFollowUp>;
     opportunities: Array<{
       domain: string;
       intent: "owner" | "buyer";
@@ -213,7 +221,12 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
     const profileRead = readAll<FollowUpProfile>(url, key, "user_profiles", {
       select: "telegram_user_id,telegram_username,telegram_first_name,telegram_last_name",
     }).catch(() => [] as FollowUpProfile[]);
-    const [events, reports, profiles, primaryLeads, legacyLeads] = await Promise.all([
+    const followUpRead = readAll<RawLeadFollowUp>(url, key, "lead_followups", {
+      select: "lead_id,status,notes,is_test,revision,updated_at",
+    }).then((rows) => ({ rows, error: null as string | null })).catch(() => ({
+      rows: [] as RawLeadFollowUp[], error: "跟进资料暂时无法读取，无法确认测试标记；商业线索暂不展示，请检查 lead-follow-up SQL。",
+    }));
+    const [events, reports, profiles, primaryLeads, legacyLeads, followUps] = await Promise.all([
       readAll<GrowthEvent>(url, key, "growth_events", {
         select: "event_name,telegram_user_id,source,domain,report_token,intent,metadata,created_at",
         created_at: `gte.${queryStart.toISOString()}`,
@@ -227,8 +240,9 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
       profileRead,
       primaryLeadRead,
       legacyLeadRead,
+      followUpRead,
     ]);
-    const leadError = [primaryLeads.error, legacyLeads.error].filter(Boolean).join("；") || null;
+    const leadError = [primaryLeads.error, legacyLeads.error, followUps.error].filter(Boolean).join("；") || null;
     return buildDashboard(
       range,
       option.days,
@@ -238,8 +252,8 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
       events,
       reports,
       profiles,
-      normalizeCommerceLeads(primaryLeads.rows, legacyLeads.rows),
-      primaryLeads.error === null,
+      followUps.error ? [] : normalizeCommerceLeads(primaryLeads.rows, legacyLeads.rows, followUps.rows),
+      primaryLeads.error === null && followUps.error === null,
       leadError,
     );
   } catch (error) {
@@ -515,12 +529,13 @@ function buildLeads(
   const handoffUsers = new Set(handoffEvents.map((event) => event.telegram_user_id));
   const unlockedUsers = new Set(events.filter((event) => event.event_name === "report_unlocked").map((event) => event.telegram_user_id));
   const juchaUsers = new Set(events.filter((event) => event.event_name === "jucha_handoff").map((event) => event.telegram_user_id));
-  const checkBotLeads = commerceLeads.filter((lead) => {
+  const allCheckBotLeads = commerceLeads.filter((lead) => {
     if (lead.database_source === "check") return true;
     const source = stringData(lead.data, "source");
     const handoffSource = stringData(lead.data, "handoff_source");
     return source === "juyu_check_bot" || handoffSource === "juyu_check_bot";
   });
+  const checkBotLeads = allCheckBotLeads.filter((lead) => !lead.isTest);
   const submittedUsers = new Set(checkBotLeads.map((lead) => lead.telegram_user_id));
   const completedHandoffUsers = intersectionSet(handoffUsers, submittedUsers);
   const commerceByUserDomain = new Map<string, CommerceLeadRow>();
@@ -621,7 +636,7 @@ function buildLeads(
     buyLeads: checkBotLeads.filter((lead) => lead.lead_type === "buy" && stringData(lead.data, "service") !== "register").length,
     sellLeads: checkBotLeads.filter((lead) => lead.lead_type === "sell").length,
     registerLeads: checkBotLeads.filter((lead) => stringData(lead.data, "service") === "register").length,
-    records: [...checkBotLeads]
+    records: [...allCheckBotLeads]
       .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
       .slice(0, 100)
       .map((lead) => ({
@@ -634,6 +649,18 @@ function buildLeads(
         username: cleanLeadUsername(lead.username),
         domain: stringData(lead.data, "domain"),
         contact: stringData(lead.data, "contact") ?? stringData(lead.data, "message"),
+        budget: stringData(lead.data, "budget"),
+        price: stringData(lead.data, "price"),
+        purpose: stringData(lead.data, "purpose"),
+        negotiable: stringData(lead.data, "negotiable"),
+        listed: stringData(lead.data, "listed"),
+        message: stringData(lead.data, "message"),
+        source: stringData(lead.data, "source") ?? "direct",
+        followUpStatus: lead.followUpStatus,
+        notes: lead.notes,
+        isTest: lead.isTest,
+        revision: lead.revision,
+        followUpUpdatedAt: lead.followUpUpdatedAt,
         status: lead.status,
         createdAt: lead.created_at,
       })),

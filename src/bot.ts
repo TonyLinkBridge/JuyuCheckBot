@@ -175,6 +175,7 @@ export function createBot(config: Config, backend: Backend = createBackend(confi
     ]);
   });
 
+  bot.command("menu", (ctx) => ctx.reply(welcomeText, { ...html, reply_markup: welcomeKeyboard(config) }));
   bot.command("help", (ctx) => ctx.reply(helpText, html));
   bot.command("privacy", (ctx) => ctx.reply(privacyBotText, { ...html, reply_markup: privacyKeyboard(config) }));
   bot.command("recent", (ctx) => showRecentReports(ctx));

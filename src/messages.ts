@@ -77,7 +77,7 @@ export function previewReportText(report: DomainReport): string {
 域名年龄　${report.ageYears === null ? "○ 暂未取得" : `<b>${formatYears(report.ageYears)} 年</b>`}
 到期时间　${formatDate(report.rdap.expiresAt)}
 DNS 状态　${dnsStatusLine(report)}
-基础提醒　${shareAttentionCount(report) ? `⚠️ ${shareAttentionCount(report)} 项` : "✅ 本次未发现明确警报"}
+${previewAttention(report)}
 
 资料来源　${registrationSource(report)}
 取得时间　${formatDateTime(report.rdap.source.checkedAt)}
@@ -558,6 +558,26 @@ function shareSignalLines(report: DomainReport): string {
 
 function shareAttentionCount(report: DomainReport): number {
   return decisionAttention(report).filter((item) => !item.startsWith("本次可用资料未发现明确警报")).length;
+}
+
+function previewAttention(report: DomainReport): string {
+  const items: string[] = [];
+  if (report.rdap.status === "unknown") items.push("○ 资料缺失：注册资料暂未取得，不能判断是否可注册；请到注册商复核。");
+  else if (!report.rdap.expiresAt) items.push("○ 资料缺失：到期日期暂未取得，不能判断是否临近到期。");
+  if (!report.dns.checked) items.push("○ 查询未完成：DNS 本次暂未取得结果，请稍后重试；不代表域名没有解析。");
+  for (const alert of report.alerts) {
+    if (alert.includes("注册状态暂时无法")) continue;
+    let action = "请进一步核实，不代表域名一定存在交易或安全问题。";
+    if (alert.includes("到期")) action = "请联系注册商确认续费、宽限期与当前状态，不能仅凭日期判断可以抢注。";
+    else if (alert.includes("DNS 解析")) action = "请检查 DNS 配置；没有解析不代表域名未注册。";
+    else if (alert.includes("暂停解析")) action = "请联系注册商核实暂停原因。";
+    else if (alert.includes("赎回") || alert.includes("删除")) action = "请尽快向注册商核对是否还能续费或赎回。";
+    else if (alert.includes("3 个月")) action = "域名较新，购买前建议继续核对使用历史与交易方。";
+    else if (alert.includes("国际化")) action = "请核对真实字符与拼写，避免看起来相同却不是同一个域名。";
+    items.push(`⚠️ 基础提醒：${alert}；${action}`);
+  }
+  if (report.rdap.dnssec === false) items.push("ℹ️ 配置提示：DNSSEC 未启用，不代表网站一定不安全；如有防护需求，可请 DNS 服务商协助核对。");
+  return items.length ? `需要留意\n${[...new Set(items)].map(escapeHtml).join("\n")}` : "基础提醒　✅ 本次未发现明确警报（仅限已完成的检查）";
 }
 
 
