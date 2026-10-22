@@ -101,13 +101,14 @@ Dashboard 位于 `dashboard/`，与 Telegram Bot 共用仓库和 Supabase，但�
 - 访问：使用 HttpOnly、Secure、SameSite Cookie 保护的管理员密码登录
 - 指标：新用户、工具用户、解锁率、分享率、推荐新用户、Growth Loop Rate 与 K-factor
 - 分析：新用户 Cohort Funnel、Referral Funnel、Lead Conversion、Growth Gate 转化、来源质量、报告质量与最近活动
-- Lead 数据：新版 Lead 从 Check Bot Supabase 读取；可选连接旧 Commerce Supabase，在同一页面继续查看历史 Lead
+- Lead 数据：默认只从 Check Bot Supabase 读取；旧 Commerce 读取已停用，旧配置及数据库保留，不会自动迁移或删除历史数据
 
 第二个 Vercel Project 的 Root Directory 设置为 `dashboard`，并配置：
 
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+LEGACY_COMMERCE_ENABLED=false
 COMMERCE_SUPABASE_URL
 COMMERCE_SUPABASE_SECRET_KEY
 DASHBOARD_PASSWORD=至少12位的独立强密码
@@ -115,6 +116,8 @@ TELEGRAM_BOT_TOKEN=与 JuyuCheckBot 相同的 BotFather Token
 POLL_TEST_CHAT_ID=@juyuofficial
 POLL_PRODUCTION_CHAT_ID=@JUYU007
 ```
+
+`COMMERCE_` 两项可以保留原值。只有明确设置 `LEGACY_COMMERCE_ENABLED=true` 才会重新读取旧 Commerce 历史 Lead；未设置或为 `false` 时不会访问旧库。购买、出售及通知始终使用目前的 Check Bot Supabase，不受此开关影响。
 
 本地运行：
 

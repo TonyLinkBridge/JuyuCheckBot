@@ -181,7 +181,7 @@ export function FollowUpWorkspace({ data, activeSection }: { data: DashboardData
         {activeSection === "leads" ? <>
           {data.leads.commerceError ? <div className="lead-connection-notice"><AlertCircle size={14} />{data.leads.commerceError}</div> : null}
           <section className="ops-metric-grid" aria-label="商业 Lead 摘要">
-            <SummaryCard label="全部 Leads" value={data.leads.submittedLeads} detail="新 Bot 与旧 Bot 历史" icon={UserRoundSearch} tone="brand" />
+            <SummaryCard label="全部 Leads" value={data.leads.submittedLeads} detail="当前启用的数据来源" icon={UserRoundSearch} tone="brand" />
             <SummaryCard label="购买委托" value={data.leads.buyLeads} detail="已注册域名收购" icon={Handshake} />
             <SummaryCard label="出售需求" value={data.leads.sellLeads} detail="持有人提交出售" icon={BadgeDollarSign} tone="amber" />
             <SummaryCard label="注册协助" value={data.leads.registerLeads} detail="可注册域名需求" icon={CirclePlus} />

@@ -9,6 +9,7 @@ JUYU 域名体检的内部增长控制台。
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+LEGACY_COMMERCE_ENABLED=false
 COMMERCE_SUPABASE_URL
 COMMERCE_SUPABASE_SECRET_KEY
 DASHBOARD_PASSWORD
@@ -17,7 +18,7 @@ POLL_TEST_CHAT_ID
 POLL_PRODUCTION_CHAT_ID
 ```
 
-前两项连接 `@JuyuCheckBot`，`COMMERCE_` 两项连接独立的 `@JuyuDomainBot` Supabase。`TELEGRAM_BOT_TOKEN` 使用 `@JuyuCheckBot` 的 BotFather Token，只允许存在于 Dashboard 的服务器环境。两个 Chat ID 可以使用公开频道用户名（例如 `@JUYU007`）或 `-100...` 数字 ID。Dashboard 不会把 Token 或数据库密钥传给浏览器；登录后的管理员页面会显示 Telegram 用户 ID，供内部跟进使用。
+前两项连接目前的 `@JuyuCheckBot` Supabase。旧 `COMMERCE_` 配置保留，但默认不访问旧库；只有明确设置 `LEGACY_COMMERCE_ENABLED=true` 才恢复历史读取。此开关不迁移、不删除数据，也不影响当前 Bot 的购买、出售或通知。`TELEGRAM_BOT_TOKEN` 使用 `@JuyuCheckBot` 的 BotFather Token，只允许存在于 Dashboard 的服务器环境。两个 Chat ID 可以使用公开频道用户名（例如 `@JUYU007`）或 `-100...` 数字 ID。Dashboard 不会把 Token 或数据库密钥传给浏览器；登录后的管理员页面会显示 Telegram 用户 ID，供内部跟进使用。
 
 ## Deploy
 

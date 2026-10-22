@@ -197,7 +197,8 @@ export async function getDashboardData(range: RangeValue): Promise<DashboardData
         console.error("Unified leads load failed", error instanceof Error ? error.message : "unknown error");
         return { rows: [] as RawCommerceLeadRow[], error: "新 Lead 表尚未建立，请先运行最新版 supabase/schema.sql" };
       });
-    const legacyLeadRead = commerceUrl && commerceKey
+    // Keep saved legacy credentials inert unless history reads are explicitly restored.
+    const legacyLeadRead = process.env.LEGACY_COMMERCE_ENABLED === "true" && commerceUrl && commerceKey
       ? readAll<RawCommerceLeadRow>(commerceUrl, commerceKey, "leads", {
           select: "id,lead_type,telegram_user_id,username,data,status,created_at",
           created_at: `gte.${currentStart.toISOString()}`,
