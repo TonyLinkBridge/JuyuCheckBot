@@ -8,16 +8,27 @@ import type { DomainIntent } from "./domain/types.js";
 import { juchaDomainLink } from "./messages.js";
 import { landingHtml, privacyHtml } from "./privacy.js";
 import { TELEGRAM_ALLOWED_UPDATES } from "./telegram.js";
+import { dispatchLeadNotifications } from "./commerce/notifications.js";
+import { notificationWorkerAuthorized } from "./commerce/notification-auth.js";
 
 export const TELEGRAM_WEBHOOK_PATH = "/telegram/webhook";
 
 const config = loadConfig();
-const bot = createBot(config);
 const backend = createBackend(config);
+const bot = createBot(config, backend);
 const app = express();
 const telegramWebhook = webhookCallback(bot, "express");
 
 app.use(express.json({ limit: "1mb" }));
+app.post("/internal/lead-notifications", async (request, response, next) => {
+  if (!notificationWorkerAuthorized(request.header("Authorization"), config.WEBHOOK_SECRET)) {
+    response.sendStatus(401);
+    return;
+  }
+  try {
+    response.json(await dispatchLeadNotifications(backend, bot.api, config));
+  } catch (error) { next(error); }
+});
 app.get("/", (_request, response) => {
   response.type("html").send(landingHtml(config.BOT_USERNAME, config.CHANNEL_URL));
 });

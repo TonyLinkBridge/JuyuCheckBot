@@ -62,14 +62,17 @@ export function advanceCommerceText(session: CommerceSession, rawText: string): 
   }
 
   if (session.step === "contact") {
-    const data = { ...session.data, contact: text.slice(0, 500) };
+    if (!isContactInput(text)) return invalid("invalid_contact", session);
+    const { pending_check: _pending, ...storedData } = session.data;
+    const data = { ...storedData, contact: text.slice(0, 500) };
     return { kind: "complete", lead: { leadType: session.flow === "sell" ? "sell" : "buy", data } };
   }
 
   if (session.flow === "contact" && session.step === "message") {
+    const { pending_check: _pending, ...storedData } = session.data;
     return {
       kind: "complete",
-      lead: { leadType: "contact", data: { ...session.data, message: text.slice(0, 1500) } },
+      lead: { leadType: "contact", data: { ...storedData, message: text.slice(0, 1500) } },
     };
   }
 
@@ -110,8 +113,37 @@ export function advanceCommerceChoice(session: CommerceSession, choice: Commerce
 }
 
 export function resumeCommerceFlow(session: CommerceSession): CommerceTransition {
+  const { pending_check: _pending, ...data } = session.data;
+  session = { ...session, data };
   const promptKey = resumePrompt(session);
   return promptKey ? { kind: "prompt", prompt: promptKey, session } : invalid("invalid_choice", session);
+}
+
+export function domainQueryInput(text: string): string | null {
+  if (/\s/.test(text.trim())) return null;
+  try { return normalizeDomain(text).ascii; } catch { return null; }
+}
+
+export function commerceSessionExpired(session: CommerceSession, now = Date.now()): boolean {
+  if (!session.updatedAt) return false;
+  const updated = Date.parse(session.updatedAt);
+  return !Number.isFinite(updated) || now - updated > 24 * 60 * 60_000;
+}
+
+function isContactInput(text: string): boolean {
+  if (text.length > 500 || domainQueryInput(text)) return false;
+  const email = (value: string) => /^[^\s@:]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const telegram = (value: string) => /^@[a-zA-Z][a-zA-Z0-9_]{3,31}$/.test(value);
+  const phone = (value: string) => /^\+?\d{7,15}$/.test(value.replace(/[\s().-]/g, ""));
+  if (email(text) || telegram(text) || phone(text)) return true;
+  const labeled = /^(telegram|微信|wechat|whatsapp|email|邮箱|电话|手机)\s*[:：]?\s*(.+)$/i.exec(text);
+  if (!labeled) return false;
+  const method = labeled[1]!.toLowerCase();
+  const value = labeled[2]!.trim();
+  if (method === "email" || method === "邮箱") return email(value);
+  if (method === "telegram") return telegram(value) || /^用户 ID [1-9]\d{0,15}$/.test(value);
+  if (method === "微信" || method === "wechat") return /^[a-zA-Z][a-zA-Z0-9_-]{5,19}$/.test(value) || phone(value);
+  return phone(value);
 }
 
 function nextAfterDomain(action: CommerceAction, data: CommerceData): CommerceTransition {

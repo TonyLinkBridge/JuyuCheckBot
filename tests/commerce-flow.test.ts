@@ -7,6 +7,20 @@ import {
 } from "../src/commerce/flow.js";
 
 describe("unified commerce flow", () => {
+  it("rejects a domain or meaningless reply as contact information", () => {
+    const started = startCommerceFlow("buy", { domain: "example.com", source: "direct" });
+    if (started.kind !== "prompt") throw new Error("expected prompt");
+    const contact = advanceCommerceChoice(started.session, "budget:unsure");
+    if (contact.kind !== "prompt") throw new Error("expected prompt");
+    expect(advanceCommerceText(contact.session, "another-domain.com")).toMatchObject({ kind: "invalid", reason: "invalid_contact" });
+    expect(advanceCommerceText(contact.session, "ok")).toMatchObject({ kind: "invalid", reason: "invalid_contact" });
+    expect(advanceCommerceText(contact.session, "Email: not-an-email")).toMatchObject({ kind: "invalid", reason: "invalid_contact" });
+    expect(advanceCommerceText(contact.session, "WhatsApp ok")).toMatchObject({ kind: "invalid", reason: "invalid_contact" });
+    expect(advanceCommerceText(contact.session, "Telegram not a username")).toMatchObject({ kind: "invalid", reason: "invalid_contact" });
+    expect(advanceCommerceText(contact.session, "Email: buyer@example.com")).toMatchObject({ kind: "complete" });
+    expect(advanceCommerceText(contact.session, "Telegram 用户 ID 9001")).toMatchObject({ kind: "complete" });
+    expect(advanceCommerceText(contact.session, "01123831228")).toMatchObject({ kind: "complete" });
+  });
   it("keeps a checked domain and report context through a buyer Lead", () => {
     const started = startCommerceFlow("buy", {
       domain: "example.com",

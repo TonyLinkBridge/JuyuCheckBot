@@ -15,6 +15,47 @@ function event(overrides: Partial<FollowUpEvent> & Pick<FollowUpEvent, "event_na
 }
 
 describe("buildFollowUpInbox", () => {
+  it("clears a transient profile failure when the user successfully retries a check", () => {
+    const failed = event({ event_name: "user_profile_failed", telegram_user_id: 1, created_at: "2026-08-26T12:00:00Z" });
+    expect(buildFollowUpInbox([failed], now).items[0]).toMatchObject({ blocker: "用户资料保存失败，需要处理", priority: "high" });
+    const result = buildFollowUpInbox([
+      failed,
+      event({ event_name: "user_created", telegram_user_id: 1, created_at: "2026-08-26T12:01:00Z" }),
+      event({ event_name: "domain_submitted", telegram_user_id: 1, domain: "example.com", created_at: "2026-08-26T12:02:00Z" }),
+      event({ event_name: "preview_shown", telegram_user_id: 1, domain: "example.com", created_at: "2026-08-26T12:03:00Z" }),
+    ], now);
+    expect(result.items[0]).toMatchObject({ blocker: "初检已完成", priority: "low" });
+  });
+  it("does not let a previous report's unlock hide a new unfinished check", () => {
+    const result = buildFollowUpInbox([
+      event({ event_name: "report_unlocked", telegram_user_id: 1, domain: "old.com", created_at: "2026-08-26T12:00:00Z" }),
+      event({ event_name: "domain_submitted", telegram_user_id: 1, domain: "new.com", created_at: "2026-08-26T13:00:00Z" }),
+    ], now);
+    expect(result.items[0]).toMatchObject({ blocker: "尚未完成体检", priority: "medium" });
+  });
+  it("recognizes the new single-result flow as a completed check", () => {
+    const result = buildFollowUpInbox([
+      event({ event_name: "domain_submitted", telegram_user_id: 1, domain: "example.com", created_at: "2026-08-26T13:00:00Z" }),
+      event({ event_name: "preview_shown", telegram_user_id: 1, domain: "example.com", report_token: "r1", metadata: { evidenceAvailable: 7, evidenceTotal: 7 }, created_at: "2026-08-26T13:00:01Z" }),
+    ], now);
+    expect(result.items[0]).toMatchObject({ blocker: "初检已完成", priority: "low" });
+  });
+
+  it("keeps notification failures urgent until the same Lead is successfully notified", () => {
+    const submitted = event({ event_name: "lead_submitted", telegram_user_id: 1, metadata: { leadId: 28 }, created_at: "2026-08-26T13:00:00Z" });
+    const failed = event({ event_name: "lead_notification_failed", telegram_user_id: 1, metadata: { leadId: 28 }, created_at: "2026-08-26T13:01:00Z" });
+    const otherSent = event({ event_name: "lead_notification_sent", telegram_user_id: 1, metadata: { leadId: 29 }, created_at: "2026-08-26T13:02:00Z" });
+    expect(buildFollowUpInbox([submitted, failed, otherSent], now).items[0]).toMatchObject({ blocker: "管理员通知失败，等待重试", priority: "high" });
+    const sent = { ...otherSent, metadata: { leadId: 28 } };
+    expect(buildFollowUpInbox([submitted, failed, sent], now).items[0]?.priority).toBe("low");
+  });
+
+  it("shows a blocked commerce submission rather than treating it as normal research", () => {
+    const result = buildFollowUpInbox([
+      event({ event_name: "lead_start_failed", telegram_user_id: 1, intent: "buyer", domain: "example.com", created_at: "2026-08-26T13:00:00Z" }),
+    ], now);
+    expect(result.items[0]).toMatchObject({ blocker: "商业提交失败，需要处理", priority: "high" });
+  });
   it("groups a user's events into one actionable timeline with visible Telegram ID", () => {
     const result = buildFollowUpInbox([
       event({ event_name: "bot_started", telegram_user_id: 7083425177, created_at: "2026-08-26T13:35:30.000Z" }),

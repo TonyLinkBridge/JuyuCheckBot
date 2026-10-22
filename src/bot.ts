@@ -1,9 +1,9 @@
 import { Bot, Context, GrammyError, HttpError, InlineKeyboard } from "grammy";
 import { AttributionStore, sourceFromStartPayload } from "./attribution.js";
-import { createBackend, type StoredReport } from "./backend.js";
-import { advanceCommerceChoice, advanceCommerceText, resumeCommerceFlow, startCommerceFlow } from "./commerce/flow.js";
+import { createBackend, type Backend, type StoredReport } from "./backend.js";
+import { advanceCommerceChoice, advanceCommerceText, commerceSessionExpired, domainQueryInput, resumeCommerceFlow, startCommerceFlow } from "./commerce/flow.js";
+import { dispatchLeadNotifications } from "./commerce/notifications.js";
 import {
-  commerceAdminText,
   commerceCompleteText,
   commerceInvalidText,
   commercePromptKeyboard,
@@ -56,16 +56,21 @@ import { UpdateDeduplicator } from "./update-deduplicator.js";
 const html = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
 const reportCacheMs = 15 * 60 * 1000;
 
-export function createBot(config: Config): Bot {
-  const bot = new Bot(config.BOT_TOKEN);
+export function createBot(config: Config, backend: Backend = createBackend(config)): Bot {
+  const bot = new Bot(config.BOT_TOKEN, { client: { timeoutSeconds: 8 } });
   const reports = new ReportStore();
   const attribution = new AttributionStore();
-  const backend = createBackend(config);
   const updates = new UpdateDeduplicator();
   let lastCleanupAt = 0;
 
   bot.use(async (ctx, next) => {
     if (!updates.accept(ctx.update.update_id)) return;
+    // /start resolves its attribution before identifying the user. Every other
+    // private interaction also creates/refreshes the profile before child writes.
+    const isStart = ctx.message?.text && /^\/start(?:@\w+)?(?:\s|$)/i.test(ctx.message.text);
+    if (ctx.chat?.type === "private" && ctx.from && !isStart) {
+      if (!await identifyActiveUser(ctx, await sourceForUser(ctx.from.id))) return;
+    }
     await next();
   });
 
@@ -79,11 +84,8 @@ export function createBot(config: Config): Bot {
     const isSelfReferral = sharedReferral?.telegramUserId === userId;
     const requestedSource = referralToken && !sharedReferral ? "direct" : sourceFromStartPayload(payload);
     const source = attribution.set(userId, isSelfReferral ? "direct" : requestedSource);
-    const identity = await backend.identifyUser(userId, source, {
-      username: from.username,
-      firstName: from.first_name,
-      lastName: from.last_name,
-    });
+    const identity = await identifyActiveUser(ctx, source);
+    if (!identity) return;
     const startEvents = [
       backend.track({
         eventName: "bot_started",
@@ -92,9 +94,6 @@ export function createBot(config: Config): Bot {
         metadata: { isNew: identity.isNew },
       }),
     ];
-    if (identity.isNew) {
-      startEvents.push(backend.track({ eventName: "user_created", telegramUserId: userId, source }));
-    }
     if (Date.now() - lastCleanupAt > 24 * 60 * 60 * 1000) {
       lastCleanupAt = Date.now();
       startEvents.push(backend.cleanupExpiredData(PRIVACY_RETENTION_DAYS));
@@ -153,7 +152,7 @@ export function createBot(config: Config): Bot {
       await Promise.all([...startEvents, runCheck(ctx, decodeDomainParam(payload.slice("check_".length)))]);
       return;
     }
-    const unfinished = await backend.getCommerceSession(userId);
+    const unfinished = await activeCommerceSession(ctx);
     if (unfinished) {
       await Promise.all([
         ...startEvents,
@@ -199,7 +198,7 @@ export function createBot(config: Config): Bot {
   });
 
   bot.callbackQuery("commerce:resume", async (ctx) => {
-    const session = await backend.getCommerceSession(ctx.from.id);
+    const session = await activeCommerceSession(ctx);
     if (!session) {
       await ctx.answerCallbackQuery({ text: "没有未完成的操作。", show_alert: true });
       return;
@@ -214,7 +213,7 @@ export function createBot(config: Config): Bot {
   });
 
   bot.callbackQuery(/^commerce:choice:(.+)$/, async (ctx) => {
-    const session = await backend.getCommerceSession(ctx.from.id);
+    const session = await activeCommerceSession(ctx);
     if (!session) {
       await ctx.answerCallbackQuery({ text: "这个操作已经过期，请重新开始。", show_alert: true });
       return;
@@ -225,6 +224,33 @@ export function createBot(config: Config): Bot {
 
   bot.callbackQuery("start_check", async (ctx) => {
     await ctx.answerCallbackQuery({ text: "请直接在下方发送域名，例如 example.com" });
+  });
+
+  bot.callbackQuery("commerce:use_telegram", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const session = await activeCommerceSession(ctx);
+    if (!session || session.step !== "contact") {
+      await ctx.reply("这个步骤已结束，请继续当前操作。", html);
+      return;
+    }
+    const contact = ctx.from.username ? `Telegram @${ctx.from.username}` : `Telegram 用户 ID ${ctx.from.id}`;
+    await sendCommerceTransition(ctx, advanceCommerceText(session, contact), true);
+  });
+
+  bot.callbackQuery("commerce:switch_check", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const session = await activeCommerceSession(ctx);
+    const domain = session?.data.pending_check;
+    if (!session || !domain) {
+      await ctx.reply("请重新发送要查询的域名。", html);
+      return;
+    }
+    if (!await backend.clearCommerceSession(ctx.from.id)) {
+      await ctx.reply("暂时无法切换，请稍后重试。", html);
+      return;
+    }
+    await recordCommerceCancellation(ctx, session, "switched_to_check");
+    await runCheck(ctx, domain);
   });
 
   bot.callbackQuery("commerce_menu", async (ctx) => {
@@ -499,8 +525,21 @@ export function createBot(config: Config): Bot {
 
   bot.on("message:text", async (ctx) => {
     if (ctx.chat.type !== "private") return;
-    const session = await backend.getCommerceSession(ctx.from.id);
+    const session = await activeCommerceSession(ctx);
     if (session) {
+      const domain = session.step !== "domain" ? domainQueryInput(ctx.message.text) : null;
+      if (domain) {
+        const saved = await backend.saveCommerceSession(ctx.from.id, { ...session, data: { ...session.data, pending_check: domain } });
+        if (!saved) {
+          await ctx.reply("暂时无法保存这一步，请稍后重试。", html);
+          return;
+        }
+        await ctx.reply(`你还有一份未完成的表单。要切换查询 <b>${domain}</b>，还是继续填写？`, {
+          ...html, reply_markup: new InlineKeyboard().text("🔍 切换查询这个域名", "commerce:switch_check")
+            .row().text("▶️ 继续填写", "commerce:resume").text("取消表单", "commerce:cancel"),
+        });
+        return;
+      }
       await sendCommerceTransition(ctx, advanceCommerceText(session, ctx.message.text), true);
       return;
     }
@@ -527,6 +566,8 @@ export function createBot(config: Config): Bot {
     if (transition.kind !== "prompt") return;
     const saved = await backend.saveCommerceSession(userId, transition.session);
     if (!saved) {
+      await backend.track({ eventName: "lead_start_failed", telegramUserId: userId, source,
+        domain: transition.session.data.domain, reportToken, intent: commerceIntent(action), metadata: { action } });
       await ctx.reply("⚠️ 暂时无法开始提交，请稍后重试。", html);
       return;
     }
@@ -564,6 +605,10 @@ export function createBot(config: Config): Bot {
     }
     const saved = await backend.saveCommerceSession(userId, transition.session);
     if (!saved) {
+      await backend.track({ eventName: "lead_submit_failed", telegramUserId: userId,
+        source: transition.session.data.source, domain: transition.session.data.domain,
+        reportToken: transition.session.data.report_token, intent: commerceIntent(transition.session.flow),
+        metadata: { action: transition.session.flow, step: transition.session.step } });
       await ctx.reply("⚠️ 暂时无法保存这一步，请稍后重试。", html);
       return;
     }
@@ -593,6 +638,8 @@ export function createBot(config: Config): Bot {
     if (!from) return;
     const leadId = await backend.createLead(from.id, from.username, lead);
     if (leadId === null) {
+      await backend.track({ eventName: "lead_submit_failed", telegramUserId: from.id, source: lead.data.source,
+        domain: lead.data.domain, reportToken: lead.data.report_token, intent: commerceIntent(lead.leadType) });
       await ctx.reply("⚠️ 资料暂时无法提交。你的当前步骤已经保留，请稍后再试。", html);
       return;
     }
@@ -607,7 +654,10 @@ export function createBot(config: Config): Bot {
       intent: commerceIntent(action),
       metadata: { action, leadId },
     });
-    await Promise.all([
+    await backend.track({ eventName: "lead_notification_pending", telegramUserId: from.id, source,
+      domain: lead.data.domain, reportToken: lead.data.report_token, intent: commerceIntent(action), metadata: { leadId, action } });
+    // A failed user receipt must never prevent the independently queued admin delivery.
+    const outcomes = await Promise.allSettled([
       backend.clearCommerceSession(from.id),
       submitted,
       ctx.reply(commerceCompleteText(leadId, lead), {
@@ -617,38 +667,38 @@ export function createBot(config: Config): Bot {
           .row()
           .url("📡 JUYU 情报局", config.CHANNEL_URL),
       }),
+      dispatchLeadNotifications(backend, bot.api, config, leadId),
     ]);
+    if (outcomes.some((outcome) => outcome.status === "rejected")) console.error(`Lead #${leadId} saved; a post-submit task failed`);
+  }
 
-    const notified = await notifyCommerceAdmin(leadId, { id: from.id, username: from.username }, lead);
-    if (!notified) {
-      await backend.track({
-        eventName: "lead_notification_failed",
-        telegramUserId: from.id,
-        source,
-        domain: lead.data.domain,
-        reportToken: lead.data.report_token,
-        intent: commerceIntent(action),
-        metadata: { action, leadId, reason: config.ADMIN_CHAT_ID ? "telegram_send_failed" : "admin_chat_not_configured" },
+  async function identifyActiveUser(ctx: Context, source: string) {
+    const from = ctx.from!;
+    try {
+      const identity = await backend.identifyUser(from.id, source, {
+        username: from.username, firstName: from.first_name, lastName: from.last_name,
       });
+      if (identity.isNew) await backend.track({ eventName: "user_created", telegramUserId: from.id, source });
+      return identity;
+    } catch {
+      await backend.track({ eventName: "user_profile_failed", telegramUserId: from.id, source });
+      await ctx.reply("暂时无法保存你的用户资料，请稍后重试。", html);
+      return null;
     }
   }
 
-  async function notifyCommerceAdmin(
-    leadId: number,
-    user: { id: number; username?: string },
-    lead: Extract<CommerceTransition, { kind: "complete" }>["lead"],
-  ): Promise<boolean> {
-    if (!config.ADMIN_CHAT_ID) {
-      console.error(`Lead #${leadId} saved but ADMIN_CHAT_ID is not configured`);
-      return false;
-    }
-    try {
-      await bot.api.sendMessage(config.ADMIN_CHAT_ID, commerceAdminText(leadId, user, lead), html);
-      return true;
-    } catch (error) {
-      console.error(`Lead #${leadId} admin notification failed`, error instanceof Error ? error.message : "unknown error");
-      return false;
-    }
+  async function activeCommerceSession(ctx: Context): Promise<CommerceSession | null> {
+    const session = await backend.getCommerceSession(ctx.from!.id);
+    if (!session || !commerceSessionExpired(session)) return session;
+    if (!await backend.clearCommerceSession(ctx.from!.id)) throw new Error("Expired session could not be cleared");
+    await recordCommerceCancellation(ctx, session, "expired");
+    return null;
+  }
+
+  async function recordCommerceCancellation(ctx: Context, session: CommerceSession, reason: string): Promise<void> {
+    await backend.track({ eventName: "lead_cancelled", telegramUserId: ctx.from!.id,
+      source: session.data.source, domain: session.data.domain, reportToken: session.data.report_token,
+      intent: commerceIntent(session.flow), metadata: { action: session.flow, step: session.step, reason } });
   }
 
   async function cancelCommerce(ctx: Context): Promise<void> {

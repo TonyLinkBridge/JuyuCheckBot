@@ -28,7 +28,20 @@ export type GrowthEventName =
   | "lead_step_completed"
   | "lead_cancelled"
   | "lead_submitted"
+  | "lead_start_failed"
+  | "lead_submit_failed"
+  | "user_profile_failed"
+  | "lead_notification_pending"
+  | "lead_notification_sent"
   | "lead_notification_failed";
+// Notification jobs are durable in Supabase; the memory implementation is for local operation.
+export type LeadNotificationJob = {
+  leadId: number;
+  attempts: number;
+  telegramUserId: number;
+  username: string | undefined;
+  lead: CommerceLead;
+};
 
 export type GrowthEvent = {
   eventName: GrowthEventName;
@@ -78,6 +91,8 @@ export interface Backend {
   getCommerceSession(telegramUserId: number): Promise<CommerceSession | null>;
   clearCommerceSession(telegramUserId: number): Promise<boolean>;
   createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<number | null>;
+  claimLeadNotifications(limit: number, leadId?: number, now?: Date): Promise<LeadNotificationJob[]>;
+  finishLeadNotification(job: LeadNotificationJob, sent: boolean): Promise<boolean>;
   deleteUserData(telegramUserId: number): Promise<boolean>;
   cleanupExpiredData(retentionDays: number): Promise<void>;
 }
@@ -87,6 +102,7 @@ class MemoryBackend implements Backend {
   private readonly users = new Set<number>();
   private readonly commerceSessions = new Map<number, CommerceSession>();
   private nextLeadId = 1;
+  private readonly notifications = new Map<number, { job: LeadNotificationJob; state: "pending" | "processing" | "sent"; due: number }>();
 
   async track(): Promise<void> {}
 
@@ -129,7 +145,7 @@ class MemoryBackend implements Backend {
   }
 
   async saveCommerceSession(telegramUserId: number, session: CommerceSession): Promise<boolean> {
-    this.commerceSessions.set(telegramUserId, structuredClone(session));
+    this.commerceSessions.set(telegramUserId, structuredClone({ ...session, updatedAt: new Date().toISOString() }));
     return true;
   }
 
@@ -143,13 +159,37 @@ class MemoryBackend implements Backend {
     return true;
   }
 
-  async createLead(): Promise<number> {
-    return this.nextLeadId++;
+  async createLead(telegramUserId: number, username: string | undefined, lead: CommerceLead): Promise<number> {
+    const leadId = this.nextLeadId++;
+    this.notifications.set(leadId, { job: { leadId, telegramUserId, username, lead: structuredClone(lead), attempts: 0 }, state: "pending", due: Date.now() });
+    return leadId;
+  }
+
+  async claimLeadNotifications(limit: number, leadId?: number, now = new Date()): Promise<LeadNotificationJob[]> {
+    const jobs: LeadNotificationJob[] = [];
+    for (const item of this.notifications.values()) {
+      if (item.state === "sent" || item.due > now.getTime() || (leadId !== undefined && item.job.leadId !== leadId)) continue;
+      item.state = "processing";
+      item.due = now.getTime() + 5 * 60_000;
+      item.job.attempts += 1;
+      jobs.push(structuredClone(item.job));
+      if (jobs.length >= Math.max(1, Math.min(3, limit))) break;
+    }
+    return jobs;
+  }
+
+  async finishLeadNotification(job: LeadNotificationJob, sent: boolean): Promise<boolean> {
+    const item = this.notifications.get(job.leadId);
+    if (!item || item.state !== "processing" || item.job.attempts !== job.attempts) return false;
+    item.state = sent ? "sent" : "pending";
+    item.due = Date.now() + Math.min(60 * 60_000, 60_000 * 2 ** Math.min(job.attempts - 1, 6));
+    return true;
   }
 
   async deleteUserData(telegramUserId: number): Promise<boolean> {
     this.users.delete(telegramUserId);
     this.commerceSessions.delete(telegramUserId);
+    for (const [id, item] of this.notifications) if (item.job.telegramUserId === telegramUserId) this.notifications.delete(id);
     return true;
   }
 
@@ -198,9 +238,7 @@ class SupabaseBackend implements Backend {
         last_source_label: sourceLabel(source),
         ...telegramProfileColumns(publicProfile),
       });
-      if (!updated) {
-        await this.write("PATCH", path, baseUpdate);
-      }
+      if (!updated && !await this.write("PATCH", path, baseUpdate)) throw new Error("User profile update failed");
       return { isNew: false };
     }
 
@@ -225,7 +263,8 @@ class SupabaseBackend implements Backend {
     if (!inserted) {
       inserted = await this.write("POST", path, baseProfile, "resolution=ignore-duplicates,return=minimal");
     }
-    return { isNew: inserted };
+    if (!inserted) throw new Error("User profile creation failed");
+    return { isNew: true };
   }
 
   async getUserSource(telegramUserId: number): Promise<string | null> {
@@ -382,7 +421,7 @@ class SupabaseBackend implements Backend {
   async getCommerceSession(telegramUserId: number): Promise<CommerceSession | null> {
     const query = new URLSearchParams({
       telegram_user_id: `eq.${telegramUserId}`,
-      select: "flow,step,data",
+      select: "flow,step,data,updated_at",
       limit: "1",
     });
     const rows = await this.readRows(`bot_sessions?${query}`);
@@ -408,6 +447,29 @@ class SupabaseBackend implements Backend {
     return typeof id === "number" && Number.isSafeInteger(id) ? id : null;
   }
 
+  async claimLeadNotifications(limit: number, leadId?: number): Promise<LeadNotificationJob[]> {
+    const rows = await this.writeRows("rpc/claim_lead_notifications", {
+      p_limit: Math.max(1, Math.min(3, limit)), p_lead_id: leadId ?? null,
+    });
+    if (!rows) throw new Error("Notification queue unavailable");
+    return rows.flatMap((row) => {
+      if (typeof row.lead_id !== "number" || typeof row.telegram_user_id !== "number" || typeof row.attempts !== "number"
+        || !["buy", "sell", "contact"].includes(String(row.lead_type)) || !row.data || typeof row.data !== "object") return [];
+      return [{ leadId: row.lead_id, telegramUserId: row.telegram_user_id, attempts: row.attempts,
+        username: typeof row.username === "string" ? row.username : undefined,
+        lead: { leadType: row.lead_type, data: row.data } as CommerceLead }];
+    });
+  }
+
+  async finishLeadNotification(job: LeadNotificationJob, sent: boolean): Promise<boolean> {
+    const nextAttempt = new Date(Date.now() + Math.min(60 * 60_000, 60_000 * 2 ** Math.min(job.attempts - 1, 6))).toISOString();
+    const rows = await this.writeRows(`lead_notifications?lead_id=eq.${job.leadId}&state=eq.processing&attempts=eq.${job.attempts}`, {
+      state: sent ? "sent" : "pending", locked_until: null, next_attempt_at: nextAttempt,
+      sent_at: sent ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
+    }, "PATCH");
+    return rows?.length === 1;
+  }
+
   async deleteUserData(telegramUserId: number): Promise<boolean> {
     const filter = `telegram_user_id=eq.${telegramUserId}`;
     const [sessionsDeleted, leadsDeleted, reportsDeleted, eventsDeleted] = await Promise.all([
@@ -421,12 +483,7 @@ class SupabaseBackend implements Backend {
   }
 
   async cleanupExpiredData(retentionDays: number): Promise<void> {
-    const cutoff = new Date(Date.now() - Math.max(30, retentionDays) * 24 * 60 * 60 * 1000).toISOString();
-    await Promise.all([
-      this.write("DELETE", `domain_reports?created_at=lt.${encodeURIComponent(cutoff)}`),
-      this.write("DELETE", `growth_events?created_at=lt.${encodeURIComponent(cutoff)}`),
-      this.write("DELETE", `user_profiles?last_seen_at=lt.${encodeURIComponent(cutoff)}`),
-    ]);
+    await this.write("POST", "rpc/cleanup_bot_data", { p_retention_days: Math.max(30, retentionDays) });
   }
 
   private async getStoredReport(path: string): Promise<StoredReport | null> {
@@ -473,10 +530,10 @@ class SupabaseBackend implements Backend {
     }
   }
 
-  private async writeRows(path: string, body: Record<string, unknown>): Promise<Array<Record<string, unknown>> | null> {
+  private async writeRows(path: string, body: Record<string, unknown>, method = "POST"): Promise<Array<Record<string, unknown>> | null> {
     try {
       const response = await fetch(`${this.url}/rest/v1/${path}`, {
-        method: "POST",
+        method,
         headers: {
           ...this.headers(),
           "Content-Type": "application/json",
@@ -517,7 +574,7 @@ function parseCommerceSession(row: Record<string, unknown>): CommerceSession | n
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const source = (data as Record<string, unknown>).source;
   if (typeof source !== "string" || !source) return null;
-  return { flow, step, data } as CommerceSession;
+  return { flow, step, data, ...(typeof row.updated_at === "string" ? { updatedAt: row.updated_at } : {}) } as CommerceSession;
 }
 
 export function createBackend(config: Config): Backend {

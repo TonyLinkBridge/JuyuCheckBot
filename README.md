@@ -172,6 +172,16 @@ ICP 备案、中国商标、国内平台风险、网站历史、搜索表现和�
 2. 在服务器环境变量填写 `SUPABASE_URL` 与 `SUPABASE_SERVICE_ROLE_KEY`。
 3. 重新部署或重启 Bot；日志出现 `Backend mode: Supabase` 即表示已启用。
 
+### 核心流程可靠性升级
+
+在部署本次代码前，执行 `supabase/core-flow-reliability.sql`。它增加管理员通知队列与安全清理函数，不会重新通知既有 Lead。随后可运行 `supabase/tests/core-flow-reliability.sql`；测试数据全部回滚，正式客户资料不受影响。
+
+管理员通知失败会保留在队列；成功通知不会再次领取。任务中断后，五分钟租约到期可重新领取。极少数情况下 Telegram 已收信、但确认状态写入失败，重试可能重复通知；请用 Lead 编号识别同一需求。
+
+自动重试使用免费的 Supabase Cron + pg_net，每五分钟只在有到期任务时调用 Bot 的 `POST /internal/lead-notifications`。该接口拒绝未授权请求。使用 `src/commerce/notification-auth.ts` 中的算法从生产 `WEBHOOK_SECRET` 派生专用令牌，存入 Supabase Vault 的 `juyu_lead_notification_token`，再执行 `supabase/lead-notification-scheduler.sql`。不要把 Bot Token 或专用令牌写进 SQL 文件或 Git。生产 `WEBHOOK_SECRET` 更换时须同步更新 Vault 中的派生令牌。
+
+用户每次私聊操作都会更新活跃时间；未完成表单超过 24 小时失效。自动清理只删除超过保留期限的报告、行为及无关联记录的闲置用户，不通过删除用户来连带删除客户 Lead。用户主动请求删除资料的功能保持不变。
+
 ## 合并上线顺序
 
 1. 在 Check Bot Supabase 运行最新版 `supabase/schema.sql`。

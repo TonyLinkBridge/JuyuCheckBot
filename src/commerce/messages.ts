@@ -74,6 +74,11 @@ export function commercePromptKeyboard(prompt: CommercePrompt): InlineKeyboard {
     case "sell_listed":
       keyboard.text("是", "commerce:choice:listed:yes").text("否", "commerce:choice:listed:no");
       break;
+    case "buy_contact":
+    case "sell_contact":
+    case "register_contact":
+      keyboard.text("💬 使用当前 Telegram 联系我", "commerce:use_telegram");
+      break;
   }
   return keyboard.row().text("取消", "commerce:cancel");
 }
@@ -145,7 +150,8 @@ export function commerceAdminText(
   return lines.join("\n");
 }
 
-export function commerceInvalidText(reason: "invalid_domain" | "invalid_choice" | "empty_text"): string {
+export function commerceInvalidText(reason: "invalid_domain" | "invalid_choice" | "empty_text" | "invalid_contact"): string {
+  if (reason === "invalid_contact") return "请留下有效联系方式，例如 @用户名、微信：账号、手机号或 Email；也可以点击「使用当前 Telegram 联系我」。";
   if (reason === "invalid_domain") return "⚠️ 这个域名格式看起来不正确，请重新发送，例如：<code>example.com</code>";
   if (reason === "empty_text") return "⚠️ 请发送有效内容后再继续。";
   return "⚠️ 这个按钮已经过期，请继续当前步骤或取消后重新开始。";

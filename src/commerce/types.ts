@@ -22,12 +22,14 @@ export type CommerceData = {
   listed?: string;
   contact?: string;
   message?: string;
+  pending_check?: string;
 };
 
 export type CommerceSession = {
   flow: CommerceAction;
   step: CommerceStep;
   data: CommerceData;
+  updatedAt?: string;
 };
 
 export type CommercePrompt =
@@ -52,7 +54,7 @@ export type CommerceLead = {
 export type CommerceTransition =
   | { kind: "prompt"; prompt: CommercePrompt; session: CommerceSession }
   | { kind: "complete"; lead: CommerceLead }
-  | { kind: "invalid"; reason: "invalid_domain" | "invalid_choice" | "empty_text"; session: CommerceSession };
+  | { kind: "invalid"; reason: "invalid_domain" | "invalid_choice" | "empty_text" | "invalid_contact"; session: CommerceSession };
 
 export type CommerceStartContext = {
   domain?: string;

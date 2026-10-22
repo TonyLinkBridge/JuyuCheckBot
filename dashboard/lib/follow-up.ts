@@ -35,7 +35,7 @@ export type FollowUpItem = {
   domains: string[];
   intent: FollowUpIntent;
   blocker: string;
-  blockerCode: "unlock_failed" | "verification_unavailable" | "check_failed" | "commercial_follow_up" | "limited_evidence" | "incomplete" | "resolved" | "active";
+  blockerCode: "unlock_failed" | "verification_unavailable" | "check_failed" | "commercial_follow_up" | "submission_failed" | "notification_failed" | "notification_pending" | "limited_evidence" | "incomplete" | "resolved" | "active";
   priority: "high" | "medium" | "low";
   source: string;
   firstSeenAt: string;
@@ -146,6 +146,30 @@ function resolveBlocker(
   intent: FollowUpIntent,
   latestPreview: FollowUpEvent | undefined,
 ): Pick<FollowUpItem, "blocker" | "blockerCode" | "priority"> {
+  const notification = findLast(events, (item) =>
+    ["lead_notification_failed", "lead_notification_pending"].includes(item.event_name)
+    && !events.some((later) => later.event_name === "lead_notification_sent"
+      && later.metadata?.leadId === item.metadata?.leadId
+      && dateValue(later.created_at) >= dateValue(item.created_at)));
+  if (notification) {
+    return notification.event_name === "lead_notification_failed"
+      ? { blocker: "管理员通知失败，等待重试", blockerCode: "notification_failed", priority: "high" }
+      : { blocker: "客户已提交，管理员通知待发送", blockerCode: "notification_pending", priority: "high" };
+  }
+  const profileFailed = findLast(events, (item) => item.event_name === "user_profile_failed");
+  if (profileFailed && !events.some((later) =>
+    ["user_created", "bot_started", "domain_submitted", "lead_started", "lead_step_completed", "lead_submitted", "history_viewed"].includes(later.event_name)
+    && dateValue(later.created_at) > dateValue(profileFailed.created_at))) {
+    return { blocker: "用户资料保存失败，需要处理", blockerCode: "submission_failed", priority: "high" };
+  }
+  const submissionFailed = findLast(events, (item) =>
+    ["lead_start_failed", "lead_submit_failed"].includes(item.event_name));
+  if (submissionFailed && !events.some((later) =>
+    ["lead_submitted", "lead_cancelled"].includes(later.event_name)
+    && (!submissionFailed.domain || later.domain === submissionFailed.domain)
+    && dateValue(later.created_at) > dateValue(submissionFailed.created_at))) {
+    return { blocker: "商业提交失败，需要处理", blockerCode: "submission_failed", priority: "high" };
+  }
   const failed = findLast(events, (item) => item.event_name === "unlock_failed");
   if (failed && !hasLaterResolution(events, failed, "report_unlocked")) {
     return { blocker: "解锁失败", blockerCode: "unlock_failed", priority: "high" };
@@ -185,7 +209,7 @@ function resolveBlocker(
 
   const intentSelected = findLast(events, (item) => item.event_name === "intent_selected" && (item.intent === "buyer" || item.intent === "owner"));
   const handoffAfterIntent = intentSelected && events.some(
-    (item) => item.event_name === "commerce_handoff" && dateValue(item.created_at) >= dateValue(intentSelected.created_at),
+    (item) => ["commerce_handoff", "lead_started", "lead_cancelled"].includes(item.event_name) && dateValue(item.created_at) >= dateValue(intentSelected.created_at),
   );
   if (intentSelected && !handoffAfterIntent) {
     return {
@@ -201,8 +225,16 @@ function resolveBlocker(
     return { blocker: "资料不足", blockerCode: "limited_evidence", priority: "medium" };
   }
 
-  if (events.some((item) => item.event_name === "report_unlocked")) {
+  const lastSubmission = findLast(events, (item) => item.event_name === "domain_submitted");
+  if (events.some((item) => item.event_name === "report_unlocked"
+    && (!lastSubmission || (dateValue(item.created_at) >= dateValue(lastSubmission.created_at)
+      && (!lastSubmission.domain || item.domain === lastSubmission.domain))))) {
     return { blocker: "已完成解锁", blockerCode: "resolved", priority: "low" };
+  }
+
+  if (latestPreview && (!lastSubmission || (dateValue(latestPreview.created_at) >= dateValue(lastSubmission.created_at)
+    && (!lastSubmission.domain || latestPreview.domain === lastSubmission.domain)))) {
+    return { blocker: "初检已完成", blockerCode: "resolved", priority: "low" };
   }
 
   if (events.some((item) => item.event_name === "domain_submitted")) {

@@ -246,6 +246,14 @@ describe("unified commerce persistence", () => {
     data: { domain: "asset.cn", source: "channel", report_token: "report_123" },
   };
 
+  it("uses database cleanup rules that protect customer Lead profiles", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await createBackend(config()).cleanupExpiredData(180);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("rpc/cleanup_bot_data");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ p_retention_days: 180 });
+  });
+
   it("upserts a user's unfinished commerce session", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);

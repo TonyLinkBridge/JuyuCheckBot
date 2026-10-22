@@ -37,7 +37,7 @@ export function privacyHtml(serviceName: string): string {
   <h2>为什么保存</h2>
   <p>用于生成及恢复报告、提供订阅解锁、处理用户主动提交的商业需求、联系用户、衡量产品转化和改进域名资料覆盖。我们不会保存 Bot Token 或密码；没有进入商业提交流程的普通聊天内容不会保存，也不会出售这些数据。</p>
   <h2>保留与删除</h2>
-  <p>报告、产品事件和不活跃用户资料最多保留 ${PRIVACY_RETENTION_DAYS} 天。你可以在 Telegram Bot 中发送 <code>/privacy</code>，然后选择“删除我的数据”，删除报告、事件、未完成会话、新版 Lead 和用户资料。旧 Bot 历史 Lead 需通过 JUYU 管理员处理删除。删除后无法恢复。</p>
+  <p>报告和产品事件最多保留 ${PRIVACY_RETENTION_DAYS} 天。没有客户需求、未完成表单或近期活动的不活跃用户资料也会清理。主动提交的客户需求及关联用户档案保留用于跟进，不会因长期未按 Start 被自动删除。未完成表单超过 24 小时后不再继续使用。你可以在 Telegram Bot 中发送 <code>/privacy</code>，然后选择“删除我的数据”，删除报告、事件、未完成会话、新版 Lead 和用户资料。旧 Bot 历史 Lead 需通过 JUYU 管理员处理删除。删除后无法恢复。</p>
   <h2>第三方处理</h2>
   <p>服务使用 Telegram、Vercel 与 Supabase 处理请求和保存数据，各服务可能依照其政策处理必要的技术信息。</p>
   <h2>联系</h2>
