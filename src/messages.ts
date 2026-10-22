@@ -146,13 +146,15 @@ export function gateKeyboard(config: Config, token: string, intent: DomainIntent
 }
 
 export function juchaAccessText(report: DomainReport): string {
-  return `✅ <b>已解锁完整资料入口</b>
+  return `🔎 <b>前往聚查继续查询</b>
 
 🌐 <b>${escapeHtml(report.domain)}</b>
 
 可前往聚查继续查询历史 WHOIS、历史 DNS、备案、商标、网站与市场资料。
 
-聚查目前不会自动填入域名：请先复制域名，再打开聚查粘贴查询。`;
+点击下方按钮，聚查会自动带入当前域名，继续查询。
+
+如需登录或安全验证，请按聚查页面提示完成；具体可查项目与收费以聚查页面为准。`;
 }
 
 export function juchaAccessKeyboard(
@@ -161,9 +163,7 @@ export function juchaAccessKeyboard(
   token: string,
 ): InlineKeyboard {
   return new InlineKeyboard()
-    .copyText(`📋 复制 ${report.domain}`, report.domain)
-    .row()
-    .url("🔓 打开聚查完整查询", juchaHandoffLink(config, report.domain, "research", token))
+    .url("🔎 去聚查继续查询", juchaHandoffLink(config, report.domain, "research", token))
     .row()
     .text("🔎 检查另一个域名", "check_another");
 }

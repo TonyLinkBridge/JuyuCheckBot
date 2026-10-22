@@ -8,6 +8,7 @@ import {
   juchaDomainLink,
   juchaHandoffLink,
   juchaAccessKeyboard,
+  juchaAccessText,
   previewReportText,
   referralWelcomeKeyboard,
   referralWelcomeText,
@@ -314,13 +315,41 @@ describe("commerce lead messages", () => {
     expect(destination).toContain("utm_campaign=juyu_domain_check");
   });
 
-  it("offers one-tap domain copying because Jucha does not consume prefill parameters", () => {
+  it("continues the current domain directly in Jucha without a required copy step", () => {
     const keyboard = juchaAccessKeyboard(config, report, "token_123").inline_keyboard;
 
     expect(keyboard[0]?.[0]).toMatchObject({
-      text: "📋 复制 example.com",
-      copy_text: { text: "example.com" },
+      text: "🔎 去聚查继续查询",
     });
-    expect(keyboard[1]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
+    expect(keyboard[0]?.[0]?.url).toContain("www.jucha.com/zonghe/example.com");
+    expect(keyboard.flat().some((button) => "copy_text" in button)).toBe(false);
+    expect(keyboard[1]?.[0]).toMatchObject({ callback_data: "check_another" });
+  });
+
+  it("explains automatic domain carry-over without promising free Jucha results", () => {
+    const text = juchaAccessText(report);
+
+    expect(text).toContain("自动带入");
+    expect(text).toContain("example.com");
+    expect(text).toContain("登录或安全验证");
+    expect(text).toContain("收费以聚查页面为准");
+    expect(text).not.toMatch(/复制|粘贴|不会自动|已解锁完整资料/);
+  });
+
+  it("keeps source tracking on the primary Jucha continuation button", () => {
+    const trackedConfig = loadConfig({
+      BOT_TOKEN: "123456789:abcdefghijklmnopqrstuvwxyz",
+      WEBHOOK_URL: "https://juyu-check-bot.vercel.app",
+      WEBHOOK_SECRET: "valid_webhook_secret",
+    });
+    const keyboard = juchaAccessKeyboard(trackedConfig, report, "token_123").inline_keyboard;
+
+    expect(keyboard[0]?.[0]?.url).toBe(
+      "https://juyu-check-bot.vercel.app/go/jucha?report=token_123&intent=research",
+    );
+    const destination = new URL(juchaDomainLink(trackedConfig.JUCHA_URL, "taopaishop.com"));
+    expect(destination.pathname).toBe("/zonghe/taopaishop.com");
+    expect(destination.searchParams.get("utm_source")).toBe("telegram");
+    expect(destination.searchParams.get("utm_campaign")).toBe("juyu_domain_check");
   });
 });
